@@ -1,0 +1,1 @@
+cmd_/home/chris/workspace/malware/drivers/xen/monitor/monitor.ko := ld -r -m elf_x86_64 -T /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/scripts/module-common.lds --build-id -o /home/chris/workspace/malware/drivers/xen/monitor/monitor.ko /home/chris/workspace/malware/drivers/xen/monitor/monitor.o /home/chris/workspace/malware/drivers/xen/monitor/monitor.mod.o

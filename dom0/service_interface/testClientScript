@@ -1,0 +1,12 @@
+#!/bin/bash
+
+clear
+echo "tests the interface functionality of the malware project code"
+echo "arg[1] = how many processes you want to spawn"
+i=0
+
+for ((i=0;i<$1;i++))
+do
+	nice -11 ./chrisTest.py &
+done
+
