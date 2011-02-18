@@ -56,6 +56,7 @@
 #define MONITOR_BADCMD -10
 #define MONITOR_MAPFAILED -11
 #define MONITOR_XSERR -14
+#define MONITOR_ALLOCERR -15
 //#define MONITOR_DOMID_RESOLVE_FAILED -12
 
 
@@ -153,9 +154,6 @@ typedef struct monitor_share_info_t {
 	struct as_back_ring bring;
 } monitor_share_info_t;
 
-static struct class xen_malware_class = {
-	.name = DEVICE_NAME
-};
 
 /************************************************************************
 Interface and Util Variables
@@ -165,7 +163,7 @@ static int monitor_minor = 0;
 //static monitor_pfn_report *curr_monitor_pfn_report_t;
 //static unsigned long *curr_pfnlist;
 static dev_t monitor_dev;
-static struct cdev* cdev;
+static struct cdev monitor_cdev;
 static struct class* monitor_class;
 
 
@@ -173,7 +171,7 @@ static struct class* monitor_class;
 Grant table and Interdomain Variables
 ************************************************************************/
 static struct as_sring *sring;
-//static monitor_share_info_t *monitor_share_info;
+static monitor_share_info_t *monitor_share_info;
 /*
 static as_request_t request_t;
 static as_response_t response_t;
@@ -186,8 +184,8 @@ static int port;
 Interface and Util Functions
 ************************************************************************/
 static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-static int monitor_register( monitor_uspace_info_t *tmp_info);
-//static int monitor_mapmem_pfn(monitor_pfn_report *monitor_pfn_report_t);	
+static int monitor_register(monitor_share_info_t *info);
+
 //static int monitor_map_remote_page(int gref);
 
 
@@ -202,6 +200,7 @@ static unsigned long monitor_map_process(process_report_t *rep);
 //static int monitor_map(monitor_share_info_t info);
 static void monitor_dump_pages(unsigned long* mfnlist, unsigned int len);
 static void monitor_populate_report(process_report_t *rep);
+static monitor_share_info_t* monitor_populate_info(unsigned long arg);
 
 
 /************************************************************************

@@ -4,22 +4,23 @@ import fcntl, os, sys
 from array import array
 
 #Driver
-GENSHMF_XS_REGISTER_PATH = "/genshm/register"
-GENSHMF_DEVICE = "/dev/genshm"
+MALPAGE_DEVICE_NAME="malpage"
+MALPAGE_XS_REGISTER_PATH = "/malpage/register"
+MALPAGE_DEVICE = "/dev/"+MALPAGE_DEVICE_NAME
 
 
 #Commands
-GENSHMF_IOC_MAGIC = 250
-GENSHMF_REPORT = GENSHMF_IOC_MAGIC+1
-GENSHMF_PAGEINFO = GENSHMF_IOC_MAGIC+2
-GENSHMF_PFNLIST = GENSHMF_IOC_MAGIC+3
-GENSHMF_PFNCLR = GENSHMF_IOC_MAGIC+4
-GENSHMF_PFNCOUNT = GENSHMF_IOC_MAGIC+5
-GENSHMF_PFNLISTSHOW = GENSHMF_IOC_MAGIC+6
-GENSHMF_REGISTER = GENSHMF_IOC_MAGIC+8
-GENSHMF_TEST = GENSHMF_IOC_MAGIC+9
+MALPAGE_IOC_MAGIC = 250
+MALPAGE_REPORT = MALPAGE_IOC_MAGIC+1
+MALPAGE_PAGEINFO = MALPAGE_IOC_MAGIC+2
+MALPAGE_PFNLIST = MALPAGE_IOC_MAGIC+3
+MALPAGE_PFNCLR = MALPAGE_IOC_MAGIC+4
+MALPAGE_PFNCOUNT = MALPAGE_IOC_MAGIC+5
+MALPAGE_PFNLISTSHOW = MALPAGE_IOC_MAGIC+6
+MALPAGE_REGISTER = MALPAGE_IOC_MAGIC+8
+MALPAGE_TEST = MALPAGE_IOC_MAGIC+9
 
-class GENSHMF():
+class Malpage():
 	def __init__(self,fileName):
 		self._filehandle = file(fileName,'r')
 		self._output = array('I')
@@ -27,7 +28,7 @@ class GENSHMF():
 	def close(self):
 		self._filehandle.close()
 	
-	def doGENSHMFOp(self, cmd, pid):
+	def doMalpageOp(self, cmd, pid):
 		return fcntl.ioctl(self._filehandle, cmd, pid)
 
 
@@ -39,18 +40,18 @@ def main():
 		exit(1)
 	
 	pid = int(sys.argv[1])
-	ops = GENSHMF(GENSHMF_DEVICE)
+	ops = Malpage(MALPAGE_DEVICE)
 	
 	if(sys.argv[2] == "register"):
-		ops.doGENSHMFOp(GENSHMF_REGISTER, pid)
+		ops.doMalpageOp(MALPAGE_REGISTER, pid)
 	
 	elif(sys.argv[2] == "report"):
 		#Report
-		ops.doGENSHMFOp(GENSHMF_REPORT, pid)		
+		ops.doMalpageOp(MALPAGE_REPORT, pid)		
 
 	elif(sys.argv[2] == "test"):
 		#Test
-		ops.doGENSHMFOp(GENSHMF_TEST, pid)		
+		ops.doMalpageOp(MALPAGE_TEST, pid)		
 	
 
 	else:

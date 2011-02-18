@@ -93,6 +93,8 @@
 
 //Dump
 #define MALPAGE_DUMP_COUNT 10
+#define MALPAGE_RING_SIZE __RING_SIZE((struct genshm_sring *)0, PAGE_SIZE)
+#define MALPAGE_GRANT_INVALID_REF	0
 
 /************************************************************************
 Module Interface and Util Structs
@@ -154,9 +156,11 @@ typedef struct malpage_share_info_t {
 	domid_t domid;
 	grant_ref_t gref;
 	unsigned int evtchn;
-	//struct xenbus_device *xbdev;
-	//unsigned int irq;
+	unsigned int irq;
+	int ring_mfn;
+	char *uuid;
 	struct as_front_ring fring;
+
 } malpage_share_info_t;
 
 
@@ -171,6 +175,7 @@ Interface and Util Variables
 static int malpage_major = 0;
 static int malpage_minor = 0;
 static dev_t malpage_dev;
+static struct cdev malpage_cdev;
 static struct class* malpage_class;
 process_report_node_t *report_list;
 
@@ -181,7 +186,7 @@ Grant table and Interdomain Variables
 //static struct proc_dir_entry *proc_dir = NULL;
 //static struct proc_dir_entry *proc_file = NULL;
 //static char* uuid = NULL;
-static unsigned long malpage_shared_mfn;
+//static unsigned long malpage_shared_mfn;
 static	malpage_share_info_t *malpage_share_info;
  
 
@@ -211,17 +216,19 @@ Grant table and Interdomain Functions
 ************************************************************************/
 static int malpage_get_uuid(char* uuid);
 static int malpage_get_domid(void);
-static int malpage_register(void);
+static int malpage_register(malpage_share_info_t *info);
 static void malpage_deregister(void);
 static process_report_t* malpage_generate_report(struct task_struct *task);
 static int malpage_report(pid_t procID, malpage_share_info_t *info);
 static unsigned long malpage_setup_ring(malpage_share_info_t *info);
-static void malpage_destroy_ring(malpage_share_info_t *info);
+static void malpage_free_ring(malpage_share_info_t *info);
 static int malpage_grant_ring(unsigned long mfn, malpage_share_info_t *info);
-static int malpage_ungrant_ring(unsigned long mfn, malpage_share_info_t *info);
+static int malpage_ungrant_ring(malpage_share_info_t *info);
 static irqreturn_t malpage_irq_handle(int irq, void *dev_id);
 static int malpage_grant_mfn(unsigned long mfn);
 static void malpage_ungrant_mfn(unsigned long mfn, int gref);
+static int malpage_alloc_evtchn(int domid, int *port);
+static int malpage_free_evtchn(int port);
 
 
 /*

@@ -1,10 +1,11 @@
 #!/bin/sh
-#/home/chris/workspace/malware/drivers/xen/malpage/malpage.ko \
+
+PROJ_ROOT=/home/chris/workspace/malware_trunk
 
 scp chris@cloudy.cs.uvic.ca:"\
-/home/chris/workspace/malware/trunk/scripts/domU/load_domU.sh \
-/home/chris/workspace/malware/trunk/scripts/domU/refresh_domU.sh \
-/home/chris/workspace/malware/trunk/drivers/xen/genshm-front/genshm-front.ko \
-/home/chris/workspace/malware/trunk/domU/c_target_sample/sample_proc \
-/home/chris/workspace/malware/trunk/domU/genshmf/main.py" .
-#sh load_domU.sh
+$PROJ_ROOT/scripts/domU/load_domU.sh \
+$PROJ_ROOT/scripts/domU/refresh_domU.sh \
+$PROJ_ROOT/drivers/xen/malpage/malpage.ko \
+$PROJ_ROOT/domU/c_target_sample/sample_proc \
+$PROJ_ROOT/domU/python_client/main.py" .
+sh load_domU.sh

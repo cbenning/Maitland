@@ -86,7 +86,10 @@ static int malpage_init(void) {
 	int result = 0;
 	struct device *err_dev;
 
-	printk(KERN_ALERT "Loading...\n");
+	printk(KERN_ALERT "->malpage_init: Loading...\n");
+
+	if (!xen_domain())
+		return -ENODEV;
 
 	//Reserve a major number
 	result = alloc_chrdev_region(&malpage_dev, MALPAGE_MIN_MINORS, MALPAGE_MAX_MINORS, DEVICE_NAME);
@@ -95,16 +98,27 @@ static int malpage_init(void) {
 
 	if (malpage_major < 0) {
 		//printk(KERN_ALERT "Registering the character device failed with major number: %d, minor: %d", malpage_major,malpage_minor);
-		printk(KERN_ALERT "Registering the character device failed with major number: %d\n", malpage_major);
+		printk(KERN_ALERT ">malpage_init: Registering the character device failed with major number: %d\n", malpage_major);
 		return -ENODEV;
 	}
 
 	//Much simpler, but required udev to run on the machine
 	malpage_class = class_create(THIS_MODULE, DEVICE_NAME);
+
+   /* Connect the file operations with the cdev */
+	cdev_init(&malpage_cdev, &malpage_fops);
+	malpage_cdev.owner = THIS_MODULE;
+
+	/* Connect the major/minor number to the cdev */
+	if (cdev_add(&malpage_cdev, malpage_dev, 1)) {
+		printk(KERN_ALERT "->malpage_init: Failed with registering the character device");
+		return 1;
+	}
+
 	err_dev = device_create(malpage_class, NULL,malpage_dev,"%s",DEVICE_NAME);
 
 	if (err_dev == NULL) {
-		printk(KERN_ALERT "Registering the character device failed with error: %d",result);
+		printk(KERN_ALERT ">malpage_init: Registering the character device failed with error: %d",result);
 		return -ENODEV;
 	}
 
@@ -115,10 +129,10 @@ static int malpage_init(void) {
 	printk(KERN_ALERT "gref_list_t size: %lu\n", sizeof(gref_list_t));
 	#endif
 	
-	printk(KERN_ALERT "Loaded.\n");
+	printk(KERN_ALERT ">malpage_init: Loaded.\n");
 
-	malpage_register();
-	printk(KERN_ALERT "Registered.\n");
+	malpage_register(malpage_share_info);
+	printk(KERN_ALERT ">malpage_init: Registered.\n");
 
 	return 0;
 }
@@ -129,13 +143,15 @@ static int malpage_init(void) {
 
 static void malpage_exit(void) {
 
-	printk(KERN_ALERT "Unloading...\n");
+	printk(KERN_ALERT "->malpage_exit: Unloading...\n");
 	
-	malpage_deregister();
+	//malpage_deregister();
+
 	/* Unregister the device */
 	device_destroy(malpage_class,malpage_dev);
+	cdev_del(&malpage_cdev);
 	class_destroy(malpage_class);
-	unregister_chrdev(malpage_major, DEVICE_NAME);
+
 	//cdev_del(cdev);
 	//free_irq(malpage_share_info->evtchn,malpage_share_info->xbdev); //Unecessary
 	//unbind_from_irqhandler(malpage_share_info->evtchn,malpage_share_info->xbdev);
@@ -163,12 +179,6 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 	#endif
 	
 	switch(cmd){
-		case MALPAGE_REGISTER:
-			#ifdef MALPAGE_DEBUG
-			printk(KERN_ALERT "Registering\n");
-			#endif
-			return malpage_register();
-		break;
 		case MALPAGE_REPORT:
 			#ifdef MALPAGE_DEBUG
 			printk(KERN_ALERT "Reporting\n");
@@ -702,53 +712,44 @@ static int malpage_get_domid(void){
 
 
 
-static int malpage_register(void){
+static int malpage_register(malpage_share_info_t *info){
 
-	char *uuid;
-	int gref;
-	int evtchn;
 	int result;
-	int domid;
 	char *domid_str;
-	//void *tmp;
 	char *value;
 	struct xenbus_transaction *xstrans;
 	int ret;
 
 	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "building ring share.\n");
+	printk(KERN_ALERT "->malpage_register: building ring share.\n");
 	#endif
 
 	//Share ring
-	kfree(malpage_share_info);
-	malpage_share_info = kmalloc(sizeof(malpage_share_info_t),0);
-	malpage_shared_mfn = malpage_setup_ring(malpage_share_info);
+	info = kzalloc(sizeof(malpage_share_info_t),GFP_KERNEL);
+	info->ring_mfn =  malpage_setup_ring(info);
 
 	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "done building ring share\n");
-	printk(KERN_ALERT "beginning creation of xs value\n");
+	printk(KERN_ALERT "->malpage_register:done building ring share\n");
+	printk(KERN_ALERT "->malpage_register:beginning creation of xs value\n");
 	#endif
 
-	gref = malpage_share_info->gref;
-	uuid = kmalloc(MALPAGE_UUID_LENGTH,0);
-	malpage_get_uuid(uuid);
-	evtchn = malpage_share_info->evtchn;
-	domid = malpage_get_domid();
-
-	printk(KERN_ALERT "FIXME: 3");
+	//gref = malpage_share_info->gref;
+	info->uuid = kmalloc(MALPAGE_UUID_LENGTH,0);
+	malpage_get_uuid(info->uuid);
+	info->domid = malpage_get_domid();
 
 	//Ugly hack, but why not?
 	value = kmalloc(strlen(MALPAGE_XENSTORE_REGISTER_VALUE_FORMAT)+MALPAGE_UUID_LENGTH+15,0);
-	if((ret = sprintf(value, MALPAGE_XENSTORE_REGISTER_VALUE_FORMAT, domid, gref, evtchn, uuid)) < 1){
+	if((ret = sprintf(value, MALPAGE_XENSTORE_REGISTER_VALUE_FORMAT, info->domid, info->gref , info->evtchn, info->uuid)) < 1){
 		#ifdef MALPAGE_DEBUG		
-		printk(KERN_ALERT "malpage_register: sprintf broke: %d\n",ret);
+		printk(KERN_ALERT "->malpage_register: sprintf broke: %d\n",ret);
 		#endif
 		return MALPAGE_GENERALERR;
 	}
 
 	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "done creation of xs value with %s\n",value);
-	printk(KERN_ALERT "beginning registration\n");
+	printk(KERN_ALERT "->malpage_register:done creation of xs value with %s\n",value);
+	printk(KERN_ALERT "->malpage_register:beginning registration\n");
 	#endif
 	
 	xstrans = kmalloc(sizeof(struct xenbus_transaction),0);
@@ -756,7 +757,8 @@ static int malpage_register(void){
 
 	//Get a string version of the domid to use in the path
 	domid_str = kmalloc(strlen("10000"),0);
-	sprintf(domid_str, "%u", domid);
+	sprintf(domid_str, "%u", info->domid);
+
 	/*
 	The connection from the domU has an implicit root at /local/domain/<domid>.
 	If you specify a path without a leading /, then the implicit root is used, so
@@ -772,10 +774,9 @@ static int malpage_register(void){
 	//Clean up
 	kfree(value);
 	kfree(xstrans);
-	kfree(uuid);
 
 	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "done registration\n");
+	printk(KERN_ALERT "->malpage_register: done registration\n");
 	#endif
 	
 	return 0;
@@ -785,67 +786,111 @@ static int malpage_register(void){
 
 static void malpage_deregister(void){
 
-	malpage_destroy_ring(malpage_share_info);
+	malpage_free_ring(malpage_share_info);
 
 }
 
 
 static unsigned long malpage_setup_ring(malpage_share_info_t *info){
 
-	unsigned long mfn;
 	struct as_sring *sring;
-	unsigned long page;
+	int err;
 
 	#ifdef MALPAGE_DEBUG	
-	printk(KERN_ALERT "ringsetup allocating page\n");
+	printk(KERN_ALERT "->malpage_setup_ring: ringsetup allocating page\n");
 	#endif
 	
-	page = __get_free_pages(GFP_KERNEL, 1);
-	if (page == 0) {
-		#ifdef MALPAGE_DEBUG	
-		printk(KERN_ALERT "ringsetup could not get free page\n");
-		#endif
-		return 0;
+	info->gref = MALPAGE_GRANT_INVALID_REF;
+
+	sring = (struct as_sring*)__get_free_page(GFP_NOIO | __GFP_HIGH);
+	if (!sring) {
+		printk(KERN_ALERT "->malpage_setup_ring: Error allocating ring");
+		//xenbus_dev_fatal(dev, -ENOMEM, "allocating shared ring");
+		return -ENOMEM;
 	}
 
 	#ifdef MALPAGE_DEBUG	
-	printk(KERN_ALERT "ringsetup setting page as shared ring\n");
+	printk(KERN_ALERT "->malpage_setup_ring: setting page as shared ring\n");
 	#endif
 	
 	/* Put a shared ring structure on this page */
-	sring = (struct as_sring*)(page);
 	SHARED_RING_INIT(sring);
+	FRONT_RING_INIT(&info->fring, sring, PAGE_SIZE);
 
 	#ifdef MALPAGE_DEBUG	
 	printk(KERN_ALERT "ringsetup initializing shared ring\n");
 	#endif
 
-	/* info.ring is the front_ring structure */
-	FRONT_RING_INIT(&(info->fring), sring, PAGE_SIZE);            	
-	mfn = virt_to_mfn((unsigned int*)page);
+	err = gnttab_grant_foreign_access(MALPAGE_DOM0_ID, virt_to_mfn(info->fring.sring), 0);
+	//err = xenbus_grant_ring(dev, virt_to_mfn(info->fring.sring));
+	if (err < 0) {
+		free_page((unsigned long)sring);
+		info->fring.sring = NULL;
+		goto fail;
+	}
+	info->gref = err;
 
-	#ifdef MALPAGE_DEBUG	
-	printk(KERN_ALERT "ringsetup granting mfn of shared page\n");
-	#endif
+	//err = xenbus_alloc_evtchn(dev, &info->evtchn);
+	err = malpage_alloc_evtchn(info->domid, &info->evtchn); //Wrote my own
+	if (err)
+		goto fail;
 
-	malpage_grant_ring(mfn, info);
+	err = bind_evtchn_to_irqhandler(info->evtchn, malpage_irq_handle, 0, MALPAGE_CHANNEL_NAME, info);
+	if (err <= 0) {
+		//xenbus_dev_fatal(dev, err, "");
+		printk(KERN_ALERT "->genshmf_setup_ring: bind_evtchn_to_irqhandler failed");
+		goto fail;
+	}
+	info->irq = err;
 
-	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "ringsetup returning with mfn of shared page\n");
-	#endif
-
-	return mfn;
+	return 0;
+fail:
+	malpage_free_ring(info);
+	return err;
 
 }
 
 
-static void malpage_destroy_ring(malpage_share_info_t *info){
+static int malpage_alloc_evtchn(int domid, int *port){
 
-	printk(KERN_ALERT "FIXME 0\n");
-	malpage_ungrant_ring(malpage_shared_mfn,info);
-	printk(KERN_ALERT "FIXME 1\n");
-	//kfree(mfn_to_virt(malpage_shared_mfn));
-	printk(KERN_ALERT "FIXME 2\n");
+         struct evtchn_alloc_unbound alloc_unbound;
+         int err;
+
+         alloc_unbound.dom = DOMID_SELF;
+         alloc_unbound.remote_dom = domid;
+
+         err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &alloc_unbound);
+         if (err)
+				 printk(KERN_ALERT "->malpage_alloc_evtchn: Error allocating event channel");
+         else
+                 *port = alloc_unbound.port;
+
+         return err;
+}
+
+
+static int malpage_free_evtchn(int port){
+
+		struct evtchn_close close;
+		int err;
+
+        close.port = port;
+
+        err = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+        if (err)
+				printk(KERN_ALERT "->malpage_free_evtchn: Error freeing event channel %d", port);
+
+        return err;
+}
+
+
+
+static void malpage_free_ring(malpage_share_info_t *info){
+
+	if (info->irq)
+		unbind_from_irqhandler(info->irq, info);
+
+	info->evtchn = info->irq = 0;
 }
 
 
@@ -886,91 +931,6 @@ static void malpage_ungrant_mfn(unsigned long mfn, int gref){
 }
 
  
-static int malpage_grant_ring(unsigned long mfn, malpage_share_info_t *info){
-
-	int err;
-	struct xenbus_device *xbdev;
-//	info->gref = gnttab_grant_foreign_access(MALPAGE_DOM0_ID, mfn, 0);
-//
-//
-//	if (info->gref < 0) {
-//		#ifdef MALPAGE_DEBUG
-//		printk(KERN_ALERT "grant: could not grant foreign access");
-//		#endif
-//		free_page((unsigned long)mfn_to_virt(mfn));
-//		return MALPAGE_GRANTERR;
-//	}
-
-	info->gref = malpage_grant_mfn(mfn);
-
-	/*
-	bind_evtchn_to_irqhandler()
-	unbind_from_irqhandler
-	 */
-
-	// Setup an event channel to Dom0
-	//err = bind_listening_port_to_irqhandler(MALPAGE_DOM0_ID, malpage_irq_handle, 0, MALPAGE_CHANNEL_NAME, info); //Deprecated
-	//err = xenbus_alloc_evtchn(MALPAGE_DOM0_ID, info->evtchn);
-	xbdev = to_xenbus_device(malpage_dev);
-	err = xenbus_alloc_evtchn(&xbdev, &(info->evtchn));
-	//bind_evtchn_to_irqhandler(info->evtchn, malpage_irq_handle, 0, MALPAGE_CHANNEL_NAME, info);
-
-
-/*
-
-	if (err < 0) {
-		#ifdef MALPAGE_DEBUG
-		printk(KERN_ALERT "grant: could not allocate event channel");
-		#endif
-		gnttab_end_foreign_access(info->gref, 0, (unsigned long)mfn_to_virt(mfn));
-		return MALPAGE_EVTCHANERR ;
-	}
-*/
-
-	//bind_listening_port_to_irqhandler(unsigned int remote_domain, const char *devname, driver_intr_t handler, void *arg, unsigned long irqflags, unsigned int *irqp)
-	/*err = bind_listening_port_to_irqhandler(MALPAGE_DOM0_ID,MALPAGE_CHANNEL_NAME,malpage_irq_handle,0,0,info->evtchn);
-	if (err < 0) {
-		printk(KERN_ALERT "grant: could not setup event channel");
-
-	}
-*/
-
-	err = bind_evtchn_to_irqhandler(info->evtchn, malpage_irq_handle, 0, MALPAGE_CHANNEL_NAME, &malpage_dev);
-
-	if (err < 0) {
-		#ifdef MALPAGE_DEBUG
-		printk(KERN_ALERT "grant: could not setup event channel");
-		#endif
-		//gnttab_end_foreign_access(info->gref, 0, (unsigned long)mfn_to_virt(mfn));
-		return MALPAGE_EVTCHANERR ;
-	}
-
-
-	//info->irq = err;
-	//info->evtchn = err;
-//	info->evtchn = irq_to_evtchn_port(info->irq);
-
-	#ifdef MALPAGE_DEBUG
-	//printk(KERN_ALERT  "   interupt = %d, local-evtchn = %d", info->irq, info->evtchn);
-	printk(KERN_ALERT  "evtchn = %d", info->evtchn);
-	#endif
-
-	return 0;
-
-}
-
-
-static int malpage_ungrant_ring(unsigned long mfn, malpage_share_info_t *info){
-
-	printk(KERN_ALERT "FIXME 1.0\n");
-	malpage_ungrant_mfn(mfn, info->gref);
-	printk(KERN_ALERT "FIXME 1.1 %u\n",irq_from_evtchn(info->evtchn));
-	unbind_from_irqhandler(irq_from_evtchn(info->evtchn), &malpage_dev);
-	printk(KERN_ALERT "FIXME 1.2\n");
-	return 0;
-}
-
-
 
 //Gives you a malloc'ed item, dont forget to clean up when your done
 static process_report_t* malpage_generate_report(struct task_struct *task) {
@@ -1296,51 +1256,11 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 		return IRQ_HANDLED;
 
 }
-/*
-	struct response_t *ring_resp;
-	RING_IDX i, rp;
-
-	#ifdef MALPAGE_DEBUG	
-	printk(KERN_ALERT "DomU: Interrupt handler called");
-	#endif
-	
-	again:
-	rp = info.ring.sring->rsp_prod;
-	
-	printk("\nxen:DomU: ring pointers %d to %d", info.ring.rsp_cons, rp);
-	for(i=info.ring.rsp_cons; i != rp; i++) {
-		unsigned long id;
-		// what did we get from Dom0
-		ring_resp = RING_GET_RESPONSE(&(info.ring), i);
-		printk("\nxen:DomU: Recvd in IDX-%d, with id=%d, op=%d, st=%d",
-		i, ring_resp->id, ring_resp->operation, ring_resp->status);
-		id = ring_resp->id;
-		switch(ring_resp->operation) {
-		case 0:
-		      printk("\nxen:DomU: operation:0");
-		      break;
-		default:
-		      break;
-		}
-	}
-	info.ring.rsp_cons = i;
-	if (i != info.ring.req_prod_pvt) {
-		int more_to_do;
-		RING_FINAL_CHECK_FOR_RESPONSES(&info.ring, more_to_do);
-		if(more_to_do)
-		      goto again;
-	} else
-		info.ring.sring->rsp_event = i+1;
-	return IRQ_HANDLED;
-}
- */
- 
-
-
-
 
 
 /*
+
+
 
 static void malpage_store_report(process_report_t *rep){
 
@@ -1443,16 +1363,6 @@ static void malpage_delete_report(pid_t procID){
 
 
 
-
-
-
-
-
-
-
-
-
-
 static void malpage_dump_pages(unsigned long* mfnlist, unsigned int len){
 
 	unsigned int* page;
@@ -1472,44 +1382,6 @@ static void malpage_dump_pages(unsigned long* mfnlist, unsigned int len){
 }
 
 
-
-static void malpage_cleanup_grant(malpage_share_info_t *info, unsigned long pfn){
-
-	int mfn;
-
-	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "DomU: destroying grant\n");
-	#endif
-
-	mfn = pfn_to_mfn(pfn);
-
-	if(info==NULL){
-		return;
-	}
-
-	if (gnttab_query_foreign_access(info->gref) == 0) {
-
-		//Remove the grant to the page
-		#ifdef MALPAGE_DEBUG
-		printk(KERN_ALERT "DomU: Frame had not been mapped\n");
-		#endif
-		// If 3rd param is non NULL, page has to be freed
-		gnttab_end_foreign_access(info->gref, 0, mfn);
-		//free_pages(page,1);
-
-	} else {
-
-		//Remove the grant to the page
-		#ifdef MALPAGE_DEBUG
-		printk(KERN_ALERT "DomU: Frame had been mapped\n");
-		#endif
-		// Guess, we still free the page, since we are rmmod-ed
-		gnttab_end_foreign_access(info->gref, 0, mfn);
-
-	}
-
-	return;
-}
 */
 
 
