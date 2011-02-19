@@ -25,6 +25,8 @@
 #Driver
 MONITOR_DEVICE_NAME = "monitor"
 MONITOR_XS_REGISTER_PATH = "/malpage/register"
+MONITOR_XS_REPORT_PATH = "/malpage/report"
+MONITOR_XS_REPORT_READY_PATH = "/ready"
 MONITOR_DEVICE = "/dev/"+MONITOR_DEVICE_NAME
 
 
@@ -98,10 +100,26 @@ def watch_domain_register(path, xs):
         ops.doMonitorOp(MONITOR_REGISTER, procStruct)
         ops.close()
 
+        watch_path = xs.get_domain_path(int(values[0])) + "/domid"
+        print "Watching path for shutdown: "+watch_path
+        xswatch(watch_path, watch_domain_down, xs)
+        
+        #set perms of new directory: set_permissions takes a list of three tuples
+        watch_path = MONITOR_XS_REPORT_PATH+"/"+str(values[0])
+
+        th = xs.transaction_start()    
+        perm_tuple = { "dom":int(values[0]), "read":True , "write":True }
+        xs.mkdir(th,watch_path)
+        xs.set_permissions(th,watch_path, [perm_tuple,perm_tuple,perm_tuple])
+        
+        xs.transaction_end(th)
+        
+        print "Watching path for report: "+watch_path
+        xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_report, xs)
+        
+
         print "Domain "+str(value)+" registered"
 
-        watch_path = xs.get_domain_path(int(values[0])) + "/domid"
-        xswatch(watch_path, watch_domain_down, xs)
         
         #remove the watch
         return False
@@ -110,6 +128,23 @@ def watch_domain_register(path, xs):
     return True
 
 
+def watch_domain_report(path, xs):
+    
+    #read the value, see if it's valid
+    th = xs.transaction_start()    
+    value = xs.read(th, path)
+    xs.transaction_end(th)
+
+    if (len(value) > 0):
+        
+        reg_path=path.rsplit("/",1)[0]
+        print "Report found at:"+reg_path
+        
+        #remove watch
+        return False
+    
+    return True
+    
 
 def watch_domain_up(path, xs):
 

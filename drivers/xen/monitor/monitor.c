@@ -210,6 +210,7 @@ static monitor_share_info_t* monitor_populate_info(unsigned long arg){
 
 	//info->uuid = kmalloc(GENSHMB_UUID_LENGTH,0);
 	//info->uuid = tmp_info->uuid;
+
 	info->domid = tmp_info->domid;
 	#ifdef MONITOR_DEBUG
 	printk(KERN_ALERT "->monitor_populate_info: domid: %u",info->domid);

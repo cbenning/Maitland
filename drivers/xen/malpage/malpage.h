@@ -56,6 +56,10 @@
 
 //unsigned int domid:unsigned int gref:unsigned int evtchn;
 #define MALPAGE_XENSTORE_REGISTER_VALUE_FORMAT "%u:%u:%u:%s"
+#define MALPAGE_XS_REPORT_PATH "/malpage/report"
+#define MALPAGE_XS_REPORT_READY_PATH "ready"
+#define MALPAGE_XS_REPORT_GREF_PATH "grefs"
+#define MALPAGE_XS_REPORT_FRAME_PATH "frames"
 
 //IOCTL commands
 #define MALPAGE_IOC_MAGIC 250 //Magic number
@@ -95,6 +99,8 @@
 #define MALPAGE_DUMP_COUNT 10
 #define MALPAGE_RING_SIZE __RING_SIZE((struct genshm_sring *)0, PAGE_SIZE)
 #define MALPAGE_GRANT_INVALID_REF	0
+#define MALPAGE_ULONG_STR_MAX 12
+
 
 /************************************************************************
 Module Interface and Util Structs
@@ -216,8 +222,8 @@ Grant table and Interdomain Functions
 ************************************************************************/
 static int malpage_get_uuid(char* uuid);
 static int malpage_get_domid(void);
-static int malpage_register(malpage_share_info_t *info);
-static void malpage_deregister(void);
+static malpage_share_info_t* malpage_register(void);
+static void malpage_deregister(malpage_share_info_t *info);
 static process_report_t* malpage_generate_report(struct task_struct *task);
 static int malpage_report(pid_t procID, malpage_share_info_t *info);
 static unsigned long malpage_setup_ring(malpage_share_info_t *info);
@@ -229,6 +235,7 @@ static int malpage_grant_mfn(unsigned long mfn);
 static void malpage_ungrant_mfn(unsigned long mfn, int gref);
 static int malpage_alloc_evtchn(int domid, int *port);
 static int malpage_free_evtchn(int port);
+static int malpage_xs_report(process_report_t *rep);
 
 
 /*

@@ -6,6 +6,7 @@ from array import array
 #Driver
 MALPAGE_DEVICE_NAME="malpage"
 MALPAGE_XS_REGISTER_PATH = "/malpage/register"
+MALPAGE_XS_REPORT_PATH = "/malpage/report"
 MALPAGE_DEVICE = "/dev/"+MALPAGE_DEVICE_NAME
 
 

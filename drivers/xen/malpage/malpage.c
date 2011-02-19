@@ -131,7 +131,9 @@ static int malpage_init(void) {
 	
 	printk(KERN_ALERT ">malpage_init: Loaded.\n");
 
-	malpage_register(malpage_share_info);
+
+	malpage_share_info = malpage_register();
+
 	printk(KERN_ALERT ">malpage_init: Registered.\n");
 
 	return 0;
@@ -145,7 +147,7 @@ static void malpage_exit(void) {
 
 	printk(KERN_ALERT "->malpage_exit: Unloading...\n");
 	
-	//malpage_deregister();
+	//malpage_deregister(malpage_share_info);
 
 	/* Unregister the device */
 	device_destroy(malpage_class,malpage_dev);
@@ -712,12 +714,13 @@ static int malpage_get_domid(void){
 
 
 
-static int malpage_register(malpage_share_info_t *info){
+static malpage_share_info_t* malpage_register(void){
 
 	int result;
 	char *domid_str;
 	char *value;
 	struct xenbus_transaction *xstrans;
+	malpage_share_info_t *info;
 	int ret;
 
 	#ifdef MALPAGE_DEBUG
@@ -744,7 +747,7 @@ static int malpage_register(malpage_share_info_t *info){
 		#ifdef MALPAGE_DEBUG		
 		printk(KERN_ALERT "->malpage_register: sprintf broke: %d\n",ret);
 		#endif
-		return MALPAGE_GENERALERR;
+		//return MALPAGE_GENERALERR;
 	}
 
 	#ifdef MALPAGE_DEBUG
@@ -779,14 +782,14 @@ static int malpage_register(malpage_share_info_t *info){
 	printk(KERN_ALERT "->malpage_register: done registration\n");
 	#endif
 	
-	return 0;
+	return info;
 
 }
 
 
-static void malpage_deregister(void){
+static void malpage_deregister(malpage_share_info_t *info){
 
-	malpage_free_ring(malpage_share_info);
+	malpage_free_ring(info);
 
 }
 
@@ -899,7 +902,7 @@ static int malpage_grant_mfn(unsigned long mfn){
 
 	int gref;
 
-	printk(KERN_ALERT "malpage_grant_mfn: %ul",mfn);
+	//printk(KERN_ALERT "malpage_grant_mfn: %ul",mfn);
 	gref = gnttab_grant_foreign_access(MALPAGE_DOM0_ID, mfn, 0);
 
 	if (gref < 0) {
@@ -911,7 +914,7 @@ static int malpage_grant_mfn(unsigned long mfn){
 	}
 
 	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "Finished granting mfn: %ul\n", mfn);
+	//printk(KERN_ALERT "Finished granting mfn: %ul\n", mfn);
 	#endif
 
 	return gref;
@@ -944,7 +947,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 
 	//Get empty report
 	rep = kmalloc(sizeof(process_report_t),0);
-	rep->process_id =  task->pid;
+	rep->process_id = task->pid;
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "Getting pfn list.\n");
@@ -986,6 +989,98 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 }
 
 
+static int malpage_xs_report(process_report_t *rep){
+
+
+	struct xenbus_transaction *xstrans;
+	char *pfn_str,*report_pfn_path,*report_gref_path,*gref_str,*domid_str,*report_path;
+	int result;
+	int i;
+
+	#ifdef MALPAGE_DEBUG
+	printk(KERN_ALERT "->malpage_xs_report\n");
+	#endif
+
+	xstrans = kmalloc(sizeof(struct xenbus_transaction),0);
+	result = xenbus_transaction_start(xstrans);
+
+	//Get a string version of the domid to use in the path
+	domid_str = kzalloc(strlen("10000"),0);
+	sprintf(domid_str, "%u", rep->domid);
+
+
+	//Put grefs and frams nums in XS
+	//ULONG_MAX: 18446744073709551615
+
+	report_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str),0);
+	if((result = sprintf(report_path, "%s/%s",MALPAGE_XS_REPORT_PATH, domid_str)) < 1){
+		#ifdef MALPAGE_DEBUG
+		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
+		#endif
+		return MALPAGE_GENERALERR;
+	}
+
+	report_pfn_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_GREF_PATH),0);
+	if((result = sprintf(report_pfn_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_GREF_PATH)) < 1){
+		#ifdef MALPAGE_DEBUG
+		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
+		#endif
+		return MALPAGE_GENERALERR;
+	}
+
+	//Make gref dir
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH, "1");
+
+
+	report_gref_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_FRAME_PATH),0);
+	if((result = sprintf(report_gref_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_FRAME_PATH)) < 1){
+		#ifdef MALPAGE_DEBUG
+		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
+		#endif
+		return MALPAGE_GENERALERR;
+	}
+
+	//Make frame dir
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_FRAME_PATH, "1");
+
+	pfn_str = kzalloc(strlen("18446744073709551615"),0);
+	gref_str = kzalloc(strlen("10000"),0);
+
+	for(i=0; i < rep->pfn_list_length; i ++){
+
+		sprintf(pfn_str, "%lu",rep->pfn_list[i]);
+
+		//Signal report is finished
+		result = xenbus_write(*xstrans, report_pfn_path, pfn_str, pfn_str);
+
+		sprintf(gref_str, "%u",rep->gref_list[i]);
+
+		//Signal report is finished
+		result = xenbus_write(*xstrans, report_gref_path, gref_str, gref_str);
+
+
+	}
+
+	#ifdef MALPAGE_DEBUG
+	printk(KERN_ALERT "->malpage_xs_report: Finished writing to %s/%s\n",report_path,MALPAGE_XS_REPORT_READY_PATH);
+	#endif
+
+	//Signal report is finished
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_READY_PATH, "1");
+
+	//Finish up
+	result = xenbus_transaction_end(*xstrans, 0);
+
+	//Clean up
+	kfree(report_path);
+	kfree(domid_str);
+	kfree(xstrans);
+
+	return 0;
+
+}
+
+
 static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 
 	struct request_t *req;
@@ -1014,6 +1109,7 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 
 	//Generate and store report
 	rep = malpage_generate_report(task);
+	rep->domid = info->domid;
 	//malpage_store_report(rep);
 
 	#ifdef MALPAGE_DEBUG
@@ -1023,9 +1119,9 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
 	printk(KERN_ALERT "	pfn_list:	");
 
-	for(j=0; j < rep->pfn_list_length; j++){
+	/*for(j=0; j < rep->pfn_list_length; j++){
 		printk(KERN_ALERT "%ul",rep->pfn_list[j]);
-	}
+	}*/
 	#endif
 
 	/*
@@ -1045,8 +1141,10 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	}
 
 	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "Storing grefs in gref_list_t\n");
+	printk(KERN_ALERT "Storing report in XS\n");
 	#endif
+
+	malpage_xs_report(rep);
 
 	/*
 	tempInt = get_zeroed_page(0); //Get an empty page
@@ -1054,13 +1152,15 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	tempPFN = virt_to_pfn((void*)new_list);  //get the pfn
 	rep->first_gref = malpage_grant_mfn(tempPFN);  //grant it, put the gref in the report
 	*/
+
+	/*
 	last_link = &(rep->first_gref);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "1\n");
 	#endif
 	
-	/*
+
 	for ( i = 0; i < rep->pfn_list_length; i++) {
 		//Populate the gref list
 
@@ -1096,9 +1196,7 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	}
 	*(last_link) = 0;  //put a zero so we know there are no more gref lists
 
-	*/
-	
-	
+
 	tempInt = get_zeroed_page(0); //Get an empty page
 	int firstInt = 142;
 	int lastInt = 2689;
@@ -1110,7 +1208,11 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	tempPFN = virt_to_mfn((void*)new_list);  //get the pfn
 	*(last_link) = malpage_grant_mfn(tempPFN);  //grant it, note the gref
 	
+	*/
+
 	//Get an empty request
+
+	/*
 	req = RING_GET_REQUEST(&(info->fring), info->fring.req_prod_pvt);
 	req->operation = MALPAGE_RING_REPORT;
 
@@ -1128,6 +1230,7 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
           notify_remote_via_irq(info->evtchn);
     }
     printk(KERN_ALERT "2\n");
+    */
 	return 0;
 
 }
