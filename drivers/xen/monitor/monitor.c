@@ -165,7 +165,14 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			monitor_share_info = monitor_populate_info(arg);
 			monitor_register(monitor_share_info);
 			return 0;
-
+		break;
+		case MONITOR_REPORT:
+			#ifdef MONITOR_DEBUG
+			printk(KERN_ALERT "Received report\n");
+			#endif
+			//monitor_populate_report((( process_report_t*)arg));
+			return 0;
+		break;
 		case MONITOR_DEREGISTER:
 			#ifdef MONITOR_DEBUG
 			printk(KERN_ALERT "Deregistering domain.\n");
@@ -458,49 +465,9 @@ static unsigned long monitor_unmap_range(unsigned long addr_start, int length, i
 
 static void monitor_populate_report(process_report_t *rep){
 
-	struct vm_struct* v_start;
-	struct gnttab_map_grant_ref ops;
-	unsigned int *new_gref_list;
-	unsigned int *next_gref;
-	gref_list_t* new_list;
-	int i;
-	printk(KERN_EMERG "-1\n");
-	new_gref_list = kmalloc(sizeof(unsigned int)*rep->pfn_list_length,0); //make an empty list big enough for all the grefs
-	printk(KERN_EMERG "0\n");
-	//try mapping the first page of grefs
-	next_gref = &(rep->first_gref);
-
+	printk(KERN_ALERT "%u",rep->process_id);
+	
 	/*
-	
-	for ( i = 0; i < rep->pfn_list_length; i++) {
-
-		if(i%MONITOR_GREF_PAGE_COUNT==0){  //If we come to the end of a page boundary
-
-			v_start = alloc_vm_area(PAGE_SIZE);	 // Get a vmarea for a page. No actual mappings are created.
-			if (v_start == 0) {
-				free_vm_area(v_start);
-				printk(KERN_ALERT "populate_report: could not allocate page\n");
-				return -EFAULT;
-			}
-			gnttab_set_map_op(&ops, (maddr_t)((v_start->addr)+(PAGE_SIZE)), GNTMAP_host_map, *next_gref, (rep->domid));
-			if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops, 1)) {
-				printk(KERN_ALERT "populate_report: HYPERVISOR map grant ref failed\n");
-				return -EFAULT;
-			}
-			if (ops.status) {
-				printk(KERN_ALERT "populate_report:  HYPERVISOR map grant ref failed status = %d\n", ops.status);
-				return -EFAULT;
-			}
-
-			new_list = (gref_list_t*)(&v_start); //Interpret the page as a gref_list_t
-
-		}
-		new_gref_list[i] = new_list->gref_list[(i%MONITOR_GREF_PAGE_COUNT)];
-
-	}
-	rep->gref_list = new_gref_list;
-	
-	*/
 	printk(KERN_EMERG "1\n");
 	v_start = alloc_vm_area(PAGE_SIZE);	 // Get a vmarea for a page. No actual mappings are created.
 	printk(KERN_EMERG "2\n");
@@ -532,7 +499,7 @@ static void monitor_populate_report(process_report_t *rep){
 	printk(KERN_EMERG "8\n");
 	
 	printk(KERN_EMERG "%d, %d\n",firstInt,lastInt);
-	
+	*/
 	
 
 }

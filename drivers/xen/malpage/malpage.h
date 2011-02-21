@@ -58,6 +58,8 @@
 #define MALPAGE_XENSTORE_REGISTER_VALUE_FORMAT "%u:%u:%u:%s"
 #define MALPAGE_XS_REPORT_PATH "/malpage/report"
 #define MALPAGE_XS_REPORT_READY_PATH "ready"
+#define MALPAGE_XS_REPORT_DOMID_PATH "domid"
+#define MALPAGE_XS_REPORT_PID_PATH "pid"
 #define MALPAGE_XS_REPORT_GREF_PATH "grefs"
 #define MALPAGE_XS_REPORT_FRAME_PATH "frames"
 

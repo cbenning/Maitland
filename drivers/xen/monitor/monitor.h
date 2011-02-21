@@ -85,25 +85,14 @@
 /************************************************************************
 Module Interface and Util Structs
 ************************************************************************/
-//struct for linked list of PFN ids
-typedef struct monitor_pfn_report{
-	unsigned int process_id;
-	char uuid[MONITOR_UUID_LENGTH];
-	unsigned int domid;
-	unsigned long *pfnlist;
-	unsigned int process_age;
-	unsigned int pfnlist_length;
-}monitor_pfn_report;
-
-
 typedef struct process_report_t{
 	unsigned int process_id;
-	domid_t domid;
+	//domid_t domid;
+	unsigned int domid;
 	unsigned int process_age;
 	unsigned long *pfn_list;
 	unsigned int *gref_list;
 	unsigned int pfn_list_length;
-	unsigned int first_gref;
 }process_report_t;
 
 

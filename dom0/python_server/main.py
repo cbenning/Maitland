@@ -26,7 +26,10 @@
 MONITOR_DEVICE_NAME = "monitor"
 MONITOR_XS_REGISTER_PATH = "/malpage/register"
 MONITOR_XS_REPORT_PATH = "/malpage/report"
+MONITOR_XS_REPORT_GREF_PATH = "/grefs"
 MONITOR_XS_REPORT_READY_PATH = "/ready"
+MONITOR_XS_REPORT_DOMID_PATH = "/domid"
+MONITOR_XS_REPORT_PID_PATH = "/pid"
 MONITOR_DEVICE = "/dev/"+MONITOR_DEVICE_NAME
 
 
@@ -38,7 +41,7 @@ MONITOR_DEREGISTER = MONITOR_IOC_MAGIC+9
 MONITOR_MIN_DOMID = 1
 MONITOR_MAX_DOMID = 255
 
-import fcntl, os, sys, time, struct,commands
+import fcntl, os, sys, time, struct, commands, array
 sys.path.append("/usr/lib/xen-4.0/lib/python/")
 from xen.xend.xenstore.xsutil import *
 from xen.xend.xenstore.xswatch import *
@@ -65,7 +68,7 @@ def watch_domain_down(path, xs):
     if value == None:
 
         print "Domain down, deregistering."
-        ops = Genshmb(MONITOR_DEVICE)
+        ops = Monitor(MONITOR_DEVICE)
         ops.doMonitorOp(MONITOR_DEREGISTER, domid)
         ops.close()
 
@@ -133,13 +136,54 @@ def watch_domain_report(path, xs):
     #read the value, see if it's valid
     th = xs.transaction_start()    
     value = xs.read(th, path)
-    xs.transaction_end(th)
+    xs.transaction_end(th)    
 
     if (len(value) > 0):
         
         reg_path=path.rsplit("/",1)[0]
         print "Report found at:"+reg_path
         
+        th = xs.transaction_start()    
+        dirs = xs.ls(th, reg_path+MONITOR_XS_REPORT_GREF_PATH)
+        xs.transaction_end(th)
+        
+        grefs = []
+        pfns = []
+        count = 0
+        
+        th = xs.transaction_start()    
+        for dir in dirs:
+            grefs.append(int(dir))
+            pfns.append(int(xs.read(th,reg_path+MONITOR_XS_REPORT_GREF_PATH+"/"+str(dir))))
+            count += 1
+        
+        domid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_DOMID_PATH))
+        pid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_PID_PATH))
+        
+        xs.transaction_end(th)
+        
+        
+        print "Received "+str(count)+" grefs, now removing report"
+        
+        
+        #Nuke the report 
+        th = xs.transaction_start()    
+        xs.rm(th, reg_path)
+        xs.transaction_end(th)    
+        
+        print "Sending report to Monitor module..."       
+        
+        #print frames 
+            
+        grefArr = array.array('I',grefs)    
+        pfnArr = array.array('L',pfns)
+                
+        ops = Monitor(MONITOR_DEVICE)
+        procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],grefArr.buffer_info()[0],count)
+        ops.doMonitorOp(MONITOR_REPORT, procStruct)
+        ops.close()
+        
+        print "Reported"       
         #remove watch
         return False
     

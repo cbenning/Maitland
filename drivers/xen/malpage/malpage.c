@@ -528,6 +528,7 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 		bad = pgd_bad(*tmp_pgdt);
 
 
+
 		//If the PGD Entry actually exists
 		if(!none && !bad && present){
 
@@ -548,15 +549,14 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 					//PTE scan
 					//
 					for(pte_count = 0; pte_count < end_pte; pte_count++){
-													
-						tmp_ptet = (pte_t*)(tmp_pmdt+(sizeof(pte_t)*pte_count));					
-						none = pte_none(*tmp_ptet);
-						present = pte_present(*tmp_ptet);
 
+						tmp_ptet = (pte_t*)(tmp_pmdt+(sizeof(pte_t)*pte_count));
+						none = pte_none(*tmp_ptet);
+						present = pte_present(*tmp_ptet);//Issue here. Aparently a patch fixes a spurious fault caused by this
 						
 						//If the PTE Entry actually exists
 						if(!none && present){
-						
+
 							tsk_ptev = pte_flags(*tmp_ptet);
 						 	page_all_count++;
 							//if(!(tsk_ptev & _PAGE_IOMAP) && (tsk_ptev & _PAGE_USER) && (tsk_ptev & _PAGE_RW) && !(tsk_ptev & _PAGE_HIDDEN) && (tsk_ptev & _PAGE_DIRTY) && (tsk_ptev & _PAGE_ACCESSED)){
@@ -565,11 +565,13 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 								//Set root if we havent already
 								if(!root_exists){
 								 	pfn_root = kmalloc(sizeof(pfn_ll_node),0);
+
 								 	//pfn_root->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
 								 	pfn_root->pfn = pte_pfn(*tmp_ptet);
 								 	pfn_root->next = (void*)NULL;
 								 	root_exists = 1;
 								 	tmp_pfn_root = pfn_root;
+
 								 	continue;
 								}
 
@@ -578,17 +580,17 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 								//tmp_pfn->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
 								tmp_pfn->pfn = pte_pfn(*tmp_ptet);
 								tmp_pfn->next = (void*)NULL;
-																
+
 								//#ifdef MALPAGE_DEBUG
 								//printk(KERN_ALERT "found pfn: %lu\n",tmp_pfn->pfn);
 								//#endif
 
 								//Attach it to the current root
 								tmp_pfn_root->next = tmp_pfn;
-								
 								//Advance the pointer
 								tmp_pfn_root = tmp_pfn_root->next;
 							//}
+
 						}	
 					}
 				}	
@@ -599,6 +601,8 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 	if(uniq>0){
 		pfnlist_mkunique(pfn_root);
 	}
+
+
 
 	#ifdef MALPAGE_DEBUG		
 	printk(KERN_ALERT "pfn_list done, returning.\n");
@@ -993,7 +997,7 @@ static int malpage_xs_report(process_report_t *rep){
 
 
 	struct xenbus_transaction *xstrans;
-	char *pfn_str,*report_pfn_path,*report_gref_path,*gref_str,*domid_str,*report_path;
+	char *pfn_str,*report_gref_path,*gref_str,*domid_str,*report_path, *pid_str;
 	int result;
 	int i;
 
@@ -1008,6 +1012,9 @@ static int malpage_xs_report(process_report_t *rep){
 	domid_str = kzalloc(strlen("10000"),0);
 	sprintf(domid_str, "%u", rep->domid);
 
+	pid_str = kzalloc(strlen("100000"),0);
+	sprintf(pid_str, "%u", rep->process_id);
+
 
 	//Put grefs and frams nums in XS
 	//ULONG_MAX: 18446744073709551615
@@ -1019,9 +1026,9 @@ static int malpage_xs_report(process_report_t *rep){
 		#endif
 		return MALPAGE_GENERALERR;
 	}
-
-	report_pfn_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_GREF_PATH),0);
-	if((result = sprintf(report_pfn_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_GREF_PATH)) < 1){
+/*
+	report_pfn_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_FRAME_PATH),0);
+	if((result = sprintf(report_pfn_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_FRAME_PATH)) < 1){
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
 		#endif
@@ -1029,11 +1036,11 @@ static int malpage_xs_report(process_report_t *rep){
 	}
 
 	//Make gref dir
-	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH, "1");
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_FRAME_PATH, "1");
+*/
 
-
-	report_gref_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_FRAME_PATH),0);
-	if((result = sprintf(report_gref_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_FRAME_PATH)) < 1){
+	report_gref_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_GREF_PATH),0);
+	if((result = sprintf(report_gref_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_GREF_PATH)) < 1){
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
 		#endif
@@ -1041,7 +1048,7 @@ static int malpage_xs_report(process_report_t *rep){
 	}
 
 	//Make frame dir
-	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_FRAME_PATH, "1");
+	result = xenbus_mkdir(*xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH);
 
 	pfn_str = kzalloc(strlen("18446744073709551615"),0);
 	gref_str = kzalloc(strlen("10000"),0);
@@ -1051,15 +1058,22 @@ static int malpage_xs_report(process_report_t *rep){
 		sprintf(pfn_str, "%lu",rep->pfn_list[i]);
 
 		//Signal report is finished
-		result = xenbus_write(*xstrans, report_pfn_path, pfn_str, pfn_str);
+		//result = xenbus_write(*xstrans, report_pfn_path, pfn_str, pfn_str);
 
 		sprintf(gref_str, "%u",rep->gref_list[i]);
 
 		//Signal report is finished
-		result = xenbus_write(*xstrans, report_gref_path, gref_str, gref_str);
-
-
+		result = xenbus_write(*xstrans, report_gref_path, gref_str, pfn_str);
 	}
+
+
+	//Write domid
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_DOMID_PATH, domid_str);
+
+	//write pid
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_PID_PATH, pid_str);
+
+
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "->malpage_xs_report: Finished writing to %s/%s\n",report_path,MALPAGE_XS_REPORT_READY_PATH);
