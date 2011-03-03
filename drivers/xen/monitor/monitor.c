@@ -424,8 +424,9 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
 static int monitor_report(process_report_t *rep) {
 
-	struct vm_struct* vm_struct_list[rep->pfn_list_length];
+	//struct vm_struct** vm_struct_list[rep->pfn_list_length];
 	int i;
+	int j;
 
 	#ifdef MONITOR_DEBUG
 	printk(KERN_ALERT "Dom0: Report Received:\n");
@@ -433,19 +434,34 @@ static int monitor_report(process_report_t *rep) {
 	printk(KERN_ALERT "	domid: %u\n",rep->domid);
 	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
 
-	/*
+
 	printk(KERN_ALERT "	pfn_list:	");
-	int i;
+
 	for(i=0; i < rep->pfn_list_length; i++){
 		printk(KERN_ALERT "%lu",rep->pfn_list[i]);
 	}
-	*/
+
 	#endif
 
+	vm_struct_list = kzalloc(rep->pfn_list_length*PAGE_SIZE,0);
+	vm_area_list = kzalloc(rep->pfn_list_length*(sizeof(unsigned int*)),0);
+	j = 0;
 
 	for(i = 0; i < rep->pfn_list_length; i++){
 		vm_struct_list[i] = monitor_map_gref(rep->gref_list[i],rep->domid);
+		if(vm_struct_list[i]->size > 0){
+			vm_area_list[j] = (unsigned long)(vm_struct_list[i]->addr);
+			j++;
+		}
 	}
+
+	vm_area_list_size = j;
+	vm_struct_list_size = rep->pfn_list_length;
+
+	for(i = 0; i < rep->pfn_list_length; i++){
+		printk(KERN_ALERT "Size: index %d, %lu",i,vm_struct_list[i]->size);
+	}
+
 
 
 
@@ -610,12 +626,11 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 	if (v_start == 0) {
 		free_vm_area(v_start);
 		printk(KERN_ALERT "monitor_map_gref: could not allocate page\n");
-		return -EFAULT;
 	}
 
 	if(gref<1){
 		printk(KERN_ALERT "monitor_map_gref: gref is <0. Aborting\n");
-		return -EFAULT;
+		v_start->size = 0;
 	}
 
 	printk(KERN_ALERT "monitor_map_gref: HYPERVISOR mapping gref: %d\n",gref);
@@ -628,12 +643,12 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 */
 	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops, 1)) {
 		printk(KERN_ALERT "monitor_map_gref: HYPERVISOR map grant ref failed\n");
-		return -EFAULT;
+		v_start->size = 0;
 	}
 	if (ops.status){
-		printk(KERN_ALERT "monitor_map_gref:  HYPERVISOR map grant ref failed status = %s\n", ops.status);
-		free_vm_area(v_start);
-		return -EFAULT;
+		printk(KERN_ALERT "monitor_map_gref:  HYPERVISOR map grant ref failed status = %d\n", ops.status);
+		//free_vm_area(v_start);
+		v_start->size = 0;
 	}
 
 	return v_start;
@@ -741,6 +756,54 @@ static void monitor_dump_pages(unsigned long *addr, unsigned int numpages){
 
 	return;
 }
+
+
+static ssize_t monitor_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp){
+
+	int byte_count;
+	int i;
+	int forward;
+	int leftover;
+	unsigned long throwaway;
+
+
+	byte_count = 0;
+	forward = 1;
+	leftover = count;
+	throwaway = 0;
+
+
+
+	//find index to start;
+	while(i*MONITOR_VMSTRUCT_SIZE<*offp){
+		i++;
+	}
+
+	while(leftover>0){
+
+		//Copy entire block
+		if(leftover>MONITOR_VMSTRUCT_SIZE){
+			throwaway = copy_to_user(buffer,(void*)vm_area_list[i],MONITOR_VMSTRUCT_SIZE);
+			i++;
+			leftover-=MONITOR_VMSTRUCT_SIZE;
+			byte_count+=MONITOR_VMSTRUCT_SIZE;
+			continue;
+		}
+		//Copy segment of a block and return
+		if(leftover<MONITOR_VMSTRUCT_SIZE){
+			throwaway = copy_to_user(buffer,(void*)vm_area_list[i],leftover);
+			i++;
+			byte_count+=leftover;
+			leftover=0;
+			break;
+		}
+
+	}
+
+	return byte_count;
+
+}
+
 
 
 

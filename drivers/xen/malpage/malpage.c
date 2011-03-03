@@ -159,8 +159,6 @@ static void malpage_exit(void) {
 	//unbind_from_irqhandler(malpage_share_info->evtchn,malpage_share_info->xbdev);
 	//xenbus_free_evtchn(malpage_share_info->xbdev, malpage_share_info->evtchn);
 
-
-
 	printk(KERN_ALERT "Unloaded.\n");
 }
 
@@ -173,7 +171,7 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 
 	pid_t procID;
 	procID = (pid_t)arg;
-	struct task_struct *task;
+	//struct task_struct *task;
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "malpage_ioctl got PID: %d.\n", procID);
@@ -192,8 +190,8 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			printk(KERN_ALERT "Testing\n");
 			#endif
 
-			printk(KERN_ALERT "sizeof(unsigned int): %u\n",sizeof(unsigned int));
-			printk(KERN_ALERT "PAGE_SIZE: %u\n",PAGE_SIZE);
+			printk(KERN_ALERT "sizeof(unsigned int): %lu\n",sizeof(unsigned int));
+			printk(KERN_ALERT "PAGE_SIZE: %lu\n",PAGE_SIZE);
 			//Get task_struct for given pid
 			/*
 			for_each_process(task) {
@@ -223,7 +221,7 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 }
 
 
-
+/*
 static ssize_t malpage_read_gref(struct file *filp, char __user *buffer, size_t count, loff_t *offp){
 
 	unsigned int offset = *offp;
@@ -242,7 +240,7 @@ static ssize_t malpage_read_gref(struct file *filp, char __user *buffer, size_t 
 
 }
 
-
+*/
 
 
 
@@ -470,7 +468,7 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 
 	struct mm_struct *tsk_mm;
 	pgd_t *tsk_pgdt;
-	pteval_t tsk_ptev;
+	//pteval_t tsk_ptev;
 	int root_exists;
 	int page_all_count;
 	//struct task_struct *task;
@@ -481,7 +479,7 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 	int end_pte = (PAGE_SIZE/sizeof(pte_t));
 	
 	//Temp vars
-	int none, present, bad;
+	int none, present, bad, file, huge;
 	int pgd_count;
 	int pmd_count;
 	int pte_count;
@@ -527,10 +525,8 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 		present = pgd_present(*tmp_pgdt);
 		bad = pgd_bad(*tmp_pgdt);
 
-
-
 		//If the PGD Entry actually exists
-		if(!none && !bad && present){
+		if(present && !none && !bad){
 
 			//
 			//PMD scan
@@ -543,7 +539,7 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 				bad = pmd_bad(*tmp_pmdt);
 
 				//If the PGD Entry actually exists
-				if(!none && !bad && present){
+				if( present && !none && !bad){
 
 					//
 					//PTE scan
@@ -553,11 +549,13 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 						tmp_ptet = (pte_t*)(tmp_pmdt+(sizeof(pte_t)*pte_count));
 						none = pte_none(*tmp_ptet);
 						present = pte_present(*tmp_ptet);//Issue here. Aparently a patch fixes a spurious fault caused by this
+						//file = pte_file(*tmp_ptet);
+						//huge = pte_huge(*tmp_ptet);
 						
 						//If the PTE Entry actually exists
-						if(!none && present){
+						if(present && !none){
 
-							tsk_ptev = pte_flags(*tmp_ptet);
+							//tsk_ptev = pte_flags(*tmp_ptet);
 						 	page_all_count++;
 							//if(!(tsk_ptev & _PAGE_IOMAP) && (tsk_ptev & _PAGE_USER) && (tsk_ptev & _PAGE_RW) && !(tsk_ptev & _PAGE_HIDDEN) && (tsk_ptev & _PAGE_DIRTY) && (tsk_ptev & _PAGE_ACCESSED)){
 							//if(pte_young(*tmp_ptet) && pte_dirty(*tmp_ptet)){
@@ -567,7 +565,8 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 								 	pfn_root = kmalloc(sizeof(pfn_ll_node),0);
 
 								 	//pfn_root->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
-								 	pfn_root->pfn = pte_pfn(*tmp_ptet);
+								 	//pfn_root->pfn = pte_pfn(*tmp_ptet);
+								 	pfn_root->pfn = pfn_to_mfn(pte_pfn(*tmp_ptet));
 								 	pfn_root->next = (void*)NULL;
 								 	root_exists = 1;
 								 	tmp_pfn_root = pfn_root;
@@ -578,7 +577,13 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 								tmp_pfn = kmalloc(sizeof(pfn_ll_node),0);
 								//Assign current node to the one we just found
 								//tmp_pfn->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
-								tmp_pfn->pfn = pte_pfn(*tmp_ptet);
+
+								//tmp_pfn->pfn = pte_pfn(*tmp_ptet); //Original
+								tmp_pfn->pfn = pfn_to_mfn(pte_pfn(*tmp_ptet));
+								//tmp_pfn->pfn = pfn_to_mfn(page_to_pfn(pte_page(*tmp_ptet)));
+								//tmp_pfn->pfn = pte_mfn(*tmp_ptet); //Special Xen function. MFN is what we really want here
+								//However only do-able from dom0
+
 								tmp_pfn->next = (void*)NULL;
 
 								//#ifdef MALPAGE_DEBUG
@@ -790,13 +795,13 @@ static malpage_share_info_t* malpage_register(void){
 
 }
 
-
+/*
 static void malpage_deregister(malpage_share_info_t *info){
 
 	malpage_free_ring(info);
 
 }
-
+*/
 
 static unsigned long malpage_setup_ring(malpage_share_info_t *info){
 
@@ -830,6 +835,7 @@ static unsigned long malpage_setup_ring(malpage_share_info_t *info){
 
 	err = gnttab_grant_foreign_access(MALPAGE_DOM0_ID, virt_to_mfn(info->fring.sring), 0);
 	//err = xenbus_grant_ring(dev, virt_to_mfn(info->fring.sring));
+
 	if (err < 0) {
 		free_page((unsigned long)sring);
 		info->fring.sring = NULL;
@@ -902,9 +908,9 @@ static void malpage_free_ring(malpage_share_info_t *info){
 
 
 
-static int malpage_grant_mfn(unsigned long mfn){
+static unsigned int malpage_grant_mfn(unsigned long mfn){
 
-	int gref;
+	unsigned int gref;
 
 	//printk(KERN_ALERT "malpage_grant_mfn: %ul",mfn);
 	gref = gnttab_grant_foreign_access(MALPAGE_DOM0_ID, mfn, 0);
@@ -916,6 +922,7 @@ static int malpage_grant_mfn(unsigned long mfn){
 		//free_page((unsigned long)mfn_to_virt(mfn));
 		return MALPAGE_GRANTERR;
 	}
+	printk(KERN_ALERT "malpage_grant_mfn: new gref %u",gref);
 
 	#ifdef MALPAGE_DEBUG
 	//printk(KERN_ALERT "Finished granting mfn: %ul\n", mfn);
@@ -924,10 +931,10 @@ static int malpage_grant_mfn(unsigned long mfn){
 	return gref;
 }
 
-
+/*
 static void malpage_ungrant_mfn(unsigned long mfn, int gref){
 
-	printk(KERN_ALERT "FIXME 2.1 %d, %ul\n",gref, mfn);
+	printk(KERN_ALERT "FIXME 2.1 %d, %lu\n",gref, mfn);
 	//gnttab_end_foreign_access(gref, 0, mfn);
 	printk(KERN_ALERT "FIXME 2.2\n");
 	//free_page((unsigned long)mfn_to_virt(mfn));
@@ -935,7 +942,7 @@ static void malpage_ungrant_mfn(unsigned long mfn, int gref){
 	//gnttab_end_foreign_access(gref, 0, (unsigned long)mfn_to_virt(mfn));
 
 	return;
-}
+}*/
 
  
 
@@ -1097,23 +1104,28 @@ static int malpage_xs_report(process_report_t *rep){
 
 static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 
-	struct request_t *req;
+	//struct request_t *req;
 	process_report_t *rep;
-	int notify;
+	struct pid *taskpid;
+	//int notify;
 	int i;
-	int j;
+	//int j;
 	struct task_struct *task;
-	gref_list_t* new_list;
-	unsigned int tempInt;
-	unsigned int tempPFN;
-	unsigned int *last_link;
+	//gref_list_t* new_list;
+	//unsigned int tempInt;
+	//unsigned int tempPFN;
+	//unsigned int *last_link;
 
 	//Get task_struct for given pid
+	//task = find_task_by_vpid(procID);
+
 	for_each_process(task) {
 		if ( task->pid == procID) {
 			break;
 		}
 	}
+
+	taskpid = find_get_pid(procID);
 
 	//Pause it
 	#ifdef MALPAGE_DEBUG

@@ -1,19 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MEMSIZE 20000
+#define NUMPAGES 50
+#define MEMSIZE getpagesize()*NUMPAGES
 
 
 int main( int argc, const char* argv[] ){
 
-	char* empty_var;
+	int *empty_var;
+	int i;
+	empty_var = calloc(NUMPAGES,getpagesize());
 
-	empty_var = malloc(MEMSIZE);
+	for(i=0; i < NUMPAGES; i++){
+		*(empty_var+(i*NUMPAGES)) = i;
+	}
 
 	while(1){
-
 		sleep(2);
-
 	}
 
 }

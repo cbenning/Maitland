@@ -233,7 +233,7 @@ static void malpage_free_ring(malpage_share_info_t *info);
 static int malpage_grant_ring(unsigned long mfn, malpage_share_info_t *info);
 static int malpage_ungrant_ring(malpage_share_info_t *info);
 static irqreturn_t malpage_irq_handle(int irq, void *dev_id);
-static int malpage_grant_mfn(unsigned long mfn);
+static unsigned int malpage_grant_mfn(unsigned long mfn);
 static void malpage_ungrant_mfn(unsigned long mfn, int gref);
 static int malpage_alloc_evtchn(int domid, int *port);
 static int malpage_free_evtchn(int port);

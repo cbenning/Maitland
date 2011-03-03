@@ -186,7 +186,12 @@ def watch_domain_report(path, xs):
         ops.doMonitorOp(MONITOR_REPORT, procStruct)
         ops.close()
         
-        print "Reported"       
+        print "Reported"     
+        
+        #f = open(MONITOR_DEVICE,'r')
+        #tmp = f.read()
+        #print tmp
+        
         #remove watch
         return False
     

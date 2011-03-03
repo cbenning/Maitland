@@ -82,6 +82,8 @@
 
 #define MONITOR_DUMP_COUNT 10
 
+#define MONITOR_VMSTRUCT_SIZE PAGE_SIZE*2
+
 /************************************************************************
 Module Interface and Util Structs
 ************************************************************************/
@@ -154,7 +156,10 @@ static int monitor_minor = 0;
 static dev_t monitor_dev;
 static struct cdev monitor_cdev;
 static struct class* monitor_class;
-
+struct vm_struct** vm_struct_list;
+int vm_struct_list_size;
+unsigned long* vm_area_list;
+int vm_area_list_size;
 
 /************************************************************************
 Grant table and Interdomain Variables
@@ -166,7 +171,6 @@ static as_request_t request_t;
 static as_response_t response_t;
 static int gref;
 static int port;
-
 */
 
 /************************************************************************
@@ -191,6 +195,7 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 static void monitor_dump_pages(unsigned long* mfnlist, unsigned int len);
 static process_report_t* monitor_populate_report(unsigned long arg);
 static monitor_share_info_t* monitor_populate_info(unsigned long arg);
+static ssize_t monitor_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp);
 
 
 /************************************************************************
@@ -198,7 +203,7 @@ Kernel module bindings
 ************************************************************************/
 static struct file_operations monitor_fops = {
     owner:	THIS_MODULE,
-//    read:	NULL,
+    read:	monitor_read,
 //    write:	NULL,
     ioctl:	monitor_ioctl,
 //    open:	NULL,
