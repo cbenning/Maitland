@@ -178,6 +178,9 @@ def watch_domain_report(path, xs):
         grefArr = array.array('I',grefs)    
         pfnArr = array.array('L',pfns)
                 
+        print "grefsize"+str(grefArr.itemsize)
+        print "pfnsize"+str(pfnArr.itemsize)
+        
         ops = Monitor(MONITOR_DEVICE)
         procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],grefArr.buffer_info()[0],count)
         ops.doMonitorOp(MONITOR_REPORT, procStruct)

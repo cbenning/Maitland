@@ -185,10 +185,11 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id);
 static void cleanup_grant(void);
 static int monitor_report(process_report_t *rep);
 static unsigned long monitor_unmap_range(unsigned long addr_start, int length, int blocksize);
-static unsigned long monitor_map_process(process_report_t *rep);
+//static unsigned long monitor_map_pageblock(process_report_t *rep);
+static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid);
 //static int monitor_map(monitor_share_info_t info);
 static void monitor_dump_pages(unsigned long* mfnlist, unsigned int len);
-static void monitor_populate_report(process_report_t *rep);
+static process_report_t* monitor_populate_report(unsigned long arg);
 static monitor_share_info_t* monitor_populate_info(unsigned long arg);
 
 

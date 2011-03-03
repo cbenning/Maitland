@@ -152,11 +152,15 @@ static void monitor_exit(void) {
 
 static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg) {
 	
+	process_report_t* rep;
+
 	#ifdef MONITOR_DEBUG
 	printk(KERN_ALERT "monitor_ioctl\n");
 	printk(KERN_ALERT "command: %d.\n", cmd);
 	#endif
 	
+
+
 	switch(cmd){
 		case MONITOR_REGISTER:
 			#ifdef MONITOR_DEBUG
@@ -170,7 +174,8 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#ifdef MONITOR_DEBUG
 			printk(KERN_ALERT "Received report\n");
 			#endif
-			//monitor_populate_report((( process_report_t*)arg));
+			rep = monitor_populate_report(arg);
+			monitor_report(rep);
 			return 0;
 		break;
 		case MONITOR_DEREGISTER:
@@ -419,25 +424,29 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
 static int monitor_report(process_report_t *rep) {
 
-	unsigned long addr_start;
+	struct vm_struct* vm_struct_list[rep->pfn_list_length];
+	int i;
 
 	#ifdef MONITOR_DEBUG
 	printk(KERN_ALERT "Dom0: Report Received:\n");
 	printk(KERN_ALERT "	process_id: %u\n",rep->process_id);
 	printk(KERN_ALERT "	domid: %u\n",rep->domid);
 	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
-	//printk(KERN_ALERT "	pfn_list:	");
-	int i;
+
 	/*
+	printk(KERN_ALERT "	pfn_list:	");
+	int i;
 	for(i=0; i < rep->pfn_list_length; i++){
-		printk(KERN_ALERT "%x",rep->pfn_list[i]);
+		printk(KERN_ALERT "%lu",rep->pfn_list[i]);
 	}
 	*/
 	#endif
 
-	addr_start = monitor_map_process(rep);
-	//build the report properly
-	//monitor_populate_report(rep);
+
+	for(i = 0; i < rep->pfn_list_length; i++){
+		vm_struct_list[i] = monitor_map_gref(rep->gref_list[i],rep->domid);
+	}
+
 
 
 	//Do analysis
@@ -463,10 +472,42 @@ static unsigned long monitor_unmap_range(unsigned long addr_start, int length, i
 }
 
 
-static void monitor_populate_report(process_report_t *rep){
+static process_report_t* monitor_populate_report(unsigned long arg){
 
-	printk(KERN_ALERT "%u",rep->process_id);
+	process_report_t *tmp_rep;
+	process_report_t *rep;
+	int failed = 0;
+
+	tmp_rep = (process_report_t*)arg;
+	rep = kzalloc(sizeof(process_report_t),GFP_KERNEL);
 	
+	rep->domid = tmp_rep->domid;
+	rep->process_id = tmp_rep->process_id;
+	rep->process_age = tmp_rep->process_age;
+	rep->pfn_list_length = tmp_rep->pfn_list_length;
+
+	printk(KERN_ALERT "domid %u, pid %u, age %u, count %u",rep->domid,rep->process_id, rep->process_age, rep->pfn_list_length);
+
+	rep->pfn_list = kzalloc((rep->pfn_list_length)*sizeof(unsigned long),GFP_KERNEL);
+	failed = copy_from_user((void*)rep->pfn_list,(void*)tmp_rep->pfn_list,(rep->pfn_list_length)*sizeof(unsigned long));
+
+	if(failed>0){
+		printk(KERN_ALERT "Unable to copy %u bytes of pfn list from userspace",failed);
+	}
+	else if(failed<0){
+		printk(KERN_ALERT "Err: %d",failed);
+	}
+
+	rep->gref_list = kzalloc((rep->pfn_list_length)*sizeof(unsigned int),GFP_KERNEL);
+	failed = copy_from_user((void*)rep->gref_list,(void*)tmp_rep->gref_list,(rep->pfn_list_length)*sizeof(unsigned int));
+	if(failed>0){
+		printk(KERN_ALERT "Unable to copy %u bytes of gref list from userspace",failed);
+	}
+	else if(failed<0){
+		printk(KERN_ALERT "Err: %d",failed);
+	}
+
+	return rep;
 	/*
 	printk(KERN_EMERG "1\n");
 	v_start = alloc_vm_area(PAGE_SIZE);	 // Get a vmarea for a page. No actual mappings are created.
@@ -504,46 +545,101 @@ static void monitor_populate_report(process_report_t *rep){
 
 }
 
+//Borrowed this code and tweaked from the blkback driver
+/*
+static inline unsigned long vaddr(unsigned long *addr){
+	unsigned long pfn = page_to_pfn(virt_to_page(addr));
+	return (unsigned long)pfn_to_kaddr(pfn);
+}*/
 
-static unsigned long monitor_map_process(process_report_t *rep){
 
-	struct vm_struct *v_start; //processes vm area
-	struct gnttab_map_grant_ref ops;
+
+/*
+static unsigned long monitor_map_pageblock(process_report_t *rep){
+
+	struct vm_struct** v_start; //processes vm area
+	struct gnttab_map_grant_ref ops[rep->pfn_list_length];
 	int i;
-	printk(KERN_EMERG "Got 1\n");
+
 	// Get a vmarea large enough to hold processes pages. No actual mappings are created.
 	v_start = alloc_vm_area((size_t)(PAGE_SIZE*(rep->pfn_list_length)));
-	printk(KERN_EMERG "Got 2\n");
+
 	if (v_start == 0) {
 		free_vm_area(v_start);
-		printk(KERN_ALERT "map_process: could not allocate page\n");
+		printk(KERN_ALERT "monitor_map_pageblock: could not allocate page\n");
 		return -EFAULT;
 	}
-	printk(KERN_ALERT "map_process: HYPERVISOR");
+
 	//Map in the remote pages one by one
-
 	for (i=0; i < rep->pfn_list_length ; i++){
-		printk(KERN_EMERG "Got 3\n");
-		BUG_ON(rep->gref_list[i]<0);
-
-		printk(KERN_ALERT "map_process: HYPERVISOR mapping pfn: %d\n",rep->gref_list[i]);
-		gnttab_set_map_op(&ops, (phys_addr_t)((v_start->addr)+(i*PAGE_SIZE)), GNTMAP_host_map, rep->gref_list[i], rep->domid);
-
-		if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops, 1)) {
-			printk(KERN_ALERT "map_process: HYPERVISOR map grant ref failed\n");
+		if(rep->gref_list[i]<0){
+			printk(KERN_ALERT "monitor_map_pageblock: gref is <0. Aborting\n");
 			return -EFAULT;
 		}
-		if (ops.status) {
-			printk(KERN_ALERT "map_process:  HYPERVISOR map grant ref failed status = %d\n", ops.status);
-			return -EFAULT;
-		}
+
+		printk(KERN_ALERT "monitor_map_pageblock: HYPERVISOR mapping gref: %d\n",rep->gref_list[i]);
+		gnttab_set_map_op(&ops[i], (((unsigned long)(v_start->phys_addr))+(i*PAGE_SIZE)), GNTMAP_host_map|GNTMAP_readonly, rep->gref_list[i], rep->domid);
 		printk(KERN_ALERT "map_process: mapped pfn %lu\n",rep->pfn_list[i]);
+
+		if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops[i], rep->pfn_list_length)) {
+			printk(KERN_ALERT "monitor_map_pageblock: HYPERVISOR map grant ref failed\n");
+
+			return -EFAULT;
+		}
+		if (ops[i].status) {
+			printk(KERN_ALERT "monitor_map_pageblock:  HYPERVISOR map grant ref failed status = %d\n", ops[i].status);
+			printk(KERN_ALERT "monitor_map_pageblock:  ERR%d\n", ERR_PTR(ops[i].status));
+			return -EFAULT;
+		}
+
 	}
 
-	printk(KERN_ALERT "map_process\n");
+	printk(KERN_ALERT "monitor_map_pageblock\n");
 	return (unsigned long)v_start->addr;
-}
+}*/
  
+
+static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid){
+
+	struct vm_struct* v_start; //processes vm area
+	struct gnttab_map_grant_ref ops;
+
+	// Get a vmarea large enough to hold processes pages. No actual mappings are created.
+	v_start = alloc_vm_area((size_t)(PAGE_SIZE));
+
+	if (v_start == 0) {
+		free_vm_area(v_start);
+		printk(KERN_ALERT "monitor_map_gref: could not allocate page\n");
+		return -EFAULT;
+	}
+
+	if(gref<1){
+		printk(KERN_ALERT "monitor_map_gref: gref is <0. Aborting\n");
+		return -EFAULT;
+	}
+
+	printk(KERN_ALERT "monitor_map_gref: HYPERVISOR mapping gref: %d\n",gref);
+	gnttab_set_map_op(&ops, (unsigned long)(v_start->addr), GNTMAP_host_map, (grant_ref_t)gref, (domid_t)domid );
+/*
+	ops.flags = GNTMAP_host_map;
+	ops.ref = gref;
+	ops.dom = domid;
+	ops.host_addr = (unsigned long)(v_start->addr);
+*/
+	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops, 1)) {
+		printk(KERN_ALERT "monitor_map_gref: HYPERVISOR map grant ref failed\n");
+		return -EFAULT;
+	}
+	if (ops.status){
+		printk(KERN_ALERT "monitor_map_gref:  HYPERVISOR map grant ref failed status = %s\n", ops.status);
+		free_vm_area(v_start);
+		return -EFAULT;
+	}
+
+	return v_start;
+
+}
+
 /* */
 /*static int monitor_map( monitor_share_info_t info) {*/
 
