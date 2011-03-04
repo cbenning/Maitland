@@ -429,12 +429,11 @@ static int monitor_report(process_report_t *rep) {
 	int j;
 
 	#ifdef MONITOR_DEBUG
+
 	printk(KERN_ALERT "Dom0: Report Received:\n");
 	printk(KERN_ALERT "	process_id: %u\n",rep->process_id);
 	printk(KERN_ALERT "	domid: %u\n",rep->domid);
 	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
-
-
 	printk(KERN_ALERT "	pfn_list:	");
 
 	for(i=0; i < rep->pfn_list_length; i++){
@@ -450,7 +449,7 @@ static int monitor_report(process_report_t *rep) {
 	for(i = 0; i < rep->pfn_list_length; i++){
 		vm_struct_list[i] = monitor_map_gref(rep->gref_list[i],rep->domid);
 		if(vm_struct_list[i]->size > 0){
-			vm_area_list[j] = (unsigned long)(vm_struct_list[i]->addr);
+			*(vm_area_list+(j*sizeof(void*))) = (vm_struct_list[i]->addr);
 			j++;
 		}
 	}
@@ -772,34 +771,52 @@ static ssize_t monitor_read(struct file *filp, char __user *buffer, size_t count
 	leftover = count;
 	throwaway = 0;
 
+	//printk(KERN_ALERT "count %d\n",(int)count);
 
+
+	if(*offp > vm_area_list_size*MONITOR_VMSTRUCT_SIZE){
+		return 0;
+	}
 
 	//find index to start;
 	while(i*MONITOR_VMSTRUCT_SIZE<*offp){
+		printk(KERN_ALERT "looking forward\n");
 		i++;
 	}
 
-	while(leftover>0){
+	if(leftover > (vm_area_list_size-i)*MONITOR_VMSTRUCT_SIZE){
+		leftover = (vm_area_list_size-i)*MONITOR_VMSTRUCT_SIZE;
+	}
 
+	//printk(KERN_ALERT "2\n");
+
+	while(leftover>0){
+		printk(KERN_ALERT "leftover %d, offset: %d, count: %d\n",(int)leftover, (int)*offp, (int)count);
+		//printk(KERN_ALERT "2.1\n");
+		throwaway = 0;
 		//Copy entire block
-		if(leftover>MONITOR_VMSTRUCT_SIZE){
-			throwaway = copy_to_user(buffer,(void*)vm_area_list[i],MONITOR_VMSTRUCT_SIZE);
+		if(leftover>=MONITOR_VMSTRUCT_SIZE){
+			printk(KERN_ALERT "3\n");
+			throwaway = copy_to_user((buffer+byte_count),(vm_area_list+(i*sizeof(void*))),MONITOR_VMSTRUCT_SIZE);
+			printk(KERN_ALERT "failed copying %lu bytes\n",throwaway);
 			i++;
-			leftover-=MONITOR_VMSTRUCT_SIZE;
-			byte_count+=MONITOR_VMSTRUCT_SIZE;
-			continue;
+			leftover = leftover - MONITOR_VMSTRUCT_SIZE;
+			byte_count = byte_count + (MONITOR_VMSTRUCT_SIZE-throwaway);
 		}
 		//Copy segment of a block and return
-		if(leftover<MONITOR_VMSTRUCT_SIZE){
-			throwaway = copy_to_user(buffer,(void*)vm_area_list[i],leftover);
+		else{
+		//if(leftover<MONITOR_VMSTRUCT_SIZE){
+			printk(KERN_ALERT "4\n");
+			throwaway = copy_to_user((buffer+byte_count),(vm_area_list+(i*sizeof(void*))),leftover);
+			printk(KERN_ALERT "failed copying %lu bytes\n",throwaway);
 			i++;
-			byte_count+=leftover;
+			byte_count = byte_count + (leftover-throwaway) ;
 			leftover=0;
 			break;
 		}
 
 	}
-
+	//printk(KERN_ALERT "5\n");
 	return byte_count;
 
 }
@@ -809,3 +826,4 @@ static ssize_t monitor_read(struct file *filp, char __user *buffer, size_t count
 
 module_init( monitor_init);
 module_exit( monitor_exit);
+

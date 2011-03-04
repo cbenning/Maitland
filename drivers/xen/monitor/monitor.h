@@ -158,7 +158,7 @@ static struct cdev monitor_cdev;
 static struct class* monitor_class;
 struct vm_struct** vm_struct_list;
 int vm_struct_list_size;
-unsigned long* vm_area_list;
+void** vm_area_list;
 int vm_area_list_size;
 
 /************************************************************************
