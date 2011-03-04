@@ -41,7 +41,7 @@ MONITOR_DEREGISTER = MONITOR_IOC_MAGIC+9
 MONITOR_MIN_DOMID = 1
 MONITOR_MAX_DOMID = 255
 
-import fcntl, os, sys, time, struct, commands, array
+import fcntl, os, sys, time, struct, commands, array, shutil
 sys.path.append("/usr/lib/xen-4.0/lib/python/")
 from xen.xend.xenstore.xsutil import *
 from xen.xend.xenstore.xswatch import *
@@ -188,9 +188,19 @@ def watch_domain_report(path, xs):
         
         print "Reported"     
         
-        #f = open(MONITOR_DEVICE,'r')
-        #tmp = f.read()
-        #print tmp
+        print "Dumping memory"   
+        #f1 = open(MONITOR_DEVICE,'rb')
+        print "1"   
+        #filename = "dump_"+str(time.time())+".bin"
+        print "2"
+        #f2 = open("/home/malware/monitor/"+str(filename),"wb")
+        print "3"
+        #tmp = f1.read()
+        print "4"
+        #f2.write(tmp)
+        print "5"
+        #f1.close()
+        #f2.close()
         
         #remove watch
         return False
