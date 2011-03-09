@@ -144,8 +144,20 @@ typedef struct monitor_share_info_t {
 	//unsigned int irq;
 	struct as_back_ring bring;
 } monitor_share_info_t;
-
-
+/*
+struct grant_map {
+	struct list_head next;
+	struct gntdev_priv *priv;
+	struct vm_area_struct *vma;
+	int index;
+	int count;
+	int flags;
+	int is_mapped;
+	struct ioctl_gntdev_grant_ref *grants;
+	struct gnttab_map_grant_ref   *map_ops;
+	struct gnttab_unmap_grant_ref *unmap_ops;
+};
+*/
 /************************************************************************
 Interface and Util Variables
 ************************************************************************/
@@ -158,8 +170,8 @@ static struct cdev monitor_cdev;
 static struct class* monitor_class;
 struct vm_struct** vm_struct_list;
 int vm_struct_list_size;
-void** vm_area_list;
-int vm_area_list_size;
+//void** vm_area_list;
+//int vm_area_list_size;
 
 /************************************************************************
 Grant table and Interdomain Variables
@@ -195,7 +207,7 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 static void monitor_dump_pages(unsigned long* mfnlist, unsigned int len);
 static process_report_t* monitor_populate_report(unsigned long arg);
 static monitor_share_info_t* monitor_populate_info(unsigned long arg);
-static ssize_t monitor_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp);
+static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_t *offp);
 
 
 /************************************************************************

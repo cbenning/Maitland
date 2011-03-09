@@ -427,6 +427,7 @@ static int monitor_report(process_report_t *rep) {
 	//struct vm_struct** vm_struct_list[rep->pfn_list_length];
 	int i;
 	int j;
+	struct vm_struct* tmp_vm_struct;
 
 	#ifdef MONITOR_DEBUG
 
@@ -443,31 +444,26 @@ static int monitor_report(process_report_t *rep) {
 	#endif
 
 	vm_struct_list = kzalloc(rep->pfn_list_length*PAGE_SIZE,0);
-	vm_area_list = kzalloc(rep->pfn_list_length*(sizeof(unsigned int*)),0);
+	//vm_area_list = kzalloc(rep->pfn_list_length*(sizeof(unsigned int*)),0);
 	j = 0;
 
 	for(i = 0; i < rep->pfn_list_length; i++){
-		vm_struct_list[i] = monitor_map_gref(rep->gref_list[i],rep->domid);
-		if(vm_struct_list[i]->size > 0){
-			*(vm_area_list+(j*sizeof(void*))) = (vm_struct_list[i]->addr);
+		tmp_vm_struct = monitor_map_gref(rep->gref_list[i],rep->domid);
+		if(tmp_vm_struct->size > 0){
+			vm_struct_list[j] = tmp_vm_struct;
 			j++;
 		}
 	}
 
-	vm_area_list_size = j;
-	vm_struct_list_size = rep->pfn_list_length;
+	vm_struct_list_size = j;
+	//vm_area_list_size = j;
+	//vm_struct_list_size = rep->pfn_list_length;
 
-	for(i = 0; i < rep->pfn_list_length; i++){
+	for(i = 0; i < j; i++){
 		printk(KERN_ALERT "Size: index %d, %lu",i,vm_struct_list[i]->size);
 	}
 
-
-
-
 	//Do analysis
-
-
-
 
 	//Unmap RANGE
 
@@ -633,7 +629,7 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 	}
 
 	printk(KERN_ALERT "monitor_map_gref: HYPERVISOR mapping gref: %d\n",gref);
-	gnttab_set_map_op(&ops, (unsigned long)(v_start->addr), GNTMAP_host_map, (grant_ref_t)gref, (domid_t)domid );
+	gnttab_set_map_op(&ops, (unsigned long)(v_start->addr), GNTMAP_host_map|GNTMAP_application_map, (grant_ref_t)gref, (domid_t)domid );
 /*
 	ops.flags = GNTMAP_host_map;
 	ops.ref = gref;
@@ -641,7 +637,7 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 	ops.host_addr = (unsigned long)(v_start->addr);
 */
 	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops, 1)) {
-		printk(KERN_ALERT "monitor_map_gref: HYPERVISOR map grant ref failed\n");
+		printk(KERN_ALERT "%s: HYPERVISOR map grant ref failed\n",__FUNCTION__);
 		v_start->size = 0;
 	}
 	if (ops.status){
@@ -649,7 +645,9 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 		//free_vm_area(v_start);
 		v_start->size = 0;
 	}
-
+	else{
+		printk(KERN_ALERT "monitor_map_gref: test: %d",*((int*)v_start->addr));
+	}
 	return v_start;
 
 }
@@ -749,7 +747,7 @@ static void monitor_dump_pages(unsigned long *addr, unsigned int numpages){
 		//page = mfn_to_virt(mfnlist[j]);
 
 		for( i = 0; i < PAGE_SIZE; i++){
-			printk(KERN_ALERT "%x",*(addr+i));
+			//printk(KERN_ALERT "%x",*(addr+i));
 		}
 	}
 
@@ -757,7 +755,7 @@ static void monitor_dump_pages(unsigned long *addr, unsigned int numpages){
 }
 
 
-static ssize_t monitor_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp){
+static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_t *offp){
 
 	int byte_count;
 	int i;
@@ -770,22 +768,23 @@ static ssize_t monitor_read(struct file *filp, char __user *buffer, size_t count
 	forward = 1;
 	leftover = count;
 	throwaway = 0;
+	i = 0;
 
 	//printk(KERN_ALERT "count %d\n",(int)count);
 
-
-	if(*offp > vm_area_list_size*MONITOR_VMSTRUCT_SIZE){
+	//If the offset is more than we have data, just return
+	if(*offp > vm_struct_list_size*MONITOR_VMSTRUCT_SIZE){
 		return 0;
 	}
 
-	//find index to start;
+	//find index to start at;
 	while(i*MONITOR_VMSTRUCT_SIZE<*offp){
-		printk(KERN_ALERT "looking forward\n");
+		//printk(KERN_ALERT "looking forward\n");
 		i++;
 	}
 
-	if(leftover > (vm_area_list_size-i)*MONITOR_VMSTRUCT_SIZE){
-		leftover = (vm_area_list_size-i)*MONITOR_VMSTRUCT_SIZE;
+	if(leftover > (vm_struct_list_size-i)*MONITOR_VMSTRUCT_SIZE){
+		leftover = (vm_struct_list_size-i)*MONITOR_VMSTRUCT_SIZE;
 	}
 
 	//printk(KERN_ALERT "2\n");
@@ -797,17 +796,17 @@ static ssize_t monitor_read(struct file *filp, char __user *buffer, size_t count
 		//Copy entire block
 		if(leftover>=MONITOR_VMSTRUCT_SIZE){
 			printk(KERN_ALERT "3\n");
-			throwaway = copy_to_user((buffer+byte_count),(vm_area_list+(i*sizeof(void*))),MONITOR_VMSTRUCT_SIZE);
+			throwaway = copy_to_user((buffer+byte_count),vm_struct_list[i]->addr,MONITOR_VMSTRUCT_SIZE);
 			printk(KERN_ALERT "failed copying %lu bytes\n",throwaway);
 			i++;
 			leftover = leftover - MONITOR_VMSTRUCT_SIZE;
 			byte_count = byte_count + (MONITOR_VMSTRUCT_SIZE-throwaway);
 		}
 		//Copy segment of a block and return
-		else{
-		//if(leftover<MONITOR_VMSTRUCT_SIZE){
+		//else{
+		if(leftover<MONITOR_VMSTRUCT_SIZE){
 			printk(KERN_ALERT "4\n");
-			throwaway = copy_to_user((buffer+byte_count),(vm_area_list+(i*sizeof(void*))),leftover);
+			throwaway = copy_to_user((buffer+byte_count),vm_struct_list[i]->addr,leftover);
 			printk(KERN_ALERT "failed copying %lu bytes\n",throwaway);
 			i++;
 			byte_count = byte_count + (leftover-throwaway) ;
