@@ -446,7 +446,6 @@ static int monitor_report(process_report_t *rep) {
 	vm_struct_list = kzalloc(rep->pfn_list_length*PAGE_SIZE,0);
 	//vm_area_list = kzalloc(rep->pfn_list_length*(sizeof(unsigned int*)),0);
 	j = 0;
-
 	for(i = 0; i < rep->pfn_list_length; i++){
 		tmp_vm_struct = monitor_map_gref(rep->gref_list[i],rep->domid);
 		if(tmp_vm_struct->size > 0){
@@ -459,9 +458,11 @@ static int monitor_report(process_report_t *rep) {
 	//vm_area_list_size = j;
 	//vm_struct_list_size = rep->pfn_list_length;
 
+	printk(KERN_ALERT "Successfully mapped %d pages",vm_struct_list_size);
+	/*
 	for(i = 0; i < j; i++){
 		printk(KERN_ALERT "Size: index %d, %lu",i,vm_struct_list[i]->size);
-	}
+	}*/
 
 	//Do analysis
 
@@ -763,7 +764,6 @@ static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_
 	int leftover;
 	unsigned long throwaway;
 
-
 	byte_count = 0;
 	forward = 1;
 	leftover = count;
@@ -789,6 +789,7 @@ static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_
 
 	//printk(KERN_ALERT "2\n");
 
+	printk(KERN_ALERT "leftover %d, offset: %d, count: %d\n",(int)leftover, (int)*offp, (int)count);
 	while(leftover>0){
 		printk(KERN_ALERT "leftover %d, offset: %d, count: %d\n",(int)leftover, (int)*offp, (int)count);
 		//printk(KERN_ALERT "2.1\n");
@@ -803,8 +804,8 @@ static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_
 			byte_count = byte_count + (MONITOR_VMSTRUCT_SIZE-throwaway);
 		}
 		//Copy segment of a block and return
-		//else{
-		if(leftover<MONITOR_VMSTRUCT_SIZE){
+		else{
+		//if(leftover<MONITOR_VMSTRUCT_SIZE){
 			printk(KERN_ALERT "4\n");
 			throwaway = copy_to_user((buffer+byte_count),vm_struct_list[i]->addr,leftover);
 			printk(KERN_ALERT "failed copying %lu bytes\n",throwaway);
