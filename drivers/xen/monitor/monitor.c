@@ -737,7 +737,7 @@ static void cleanup_grant(void) {
       */
 }
 
-
+/*
 static void monitor_dump_pages(unsigned long *addr, unsigned int numpages){
 
 	unsigned int j;
@@ -753,7 +753,7 @@ static void monitor_dump_pages(unsigned long *addr, unsigned int numpages){
 	}
 
 	return;
-}
+}*/
 
 
 static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_t *offp){

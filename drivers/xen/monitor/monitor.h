@@ -80,8 +80,6 @@
 #define MONITOR_XENSTORE_REGISTER_PATH "/vm/malpage"
 #define MONITOR_XENSTORE_REGISTER_NODE "register"
 
-#define MONITOR_DUMP_COUNT 10
-
 #define MONITOR_VMSTRUCT_SIZE PAGE_SIZE*2
 
 /************************************************************************

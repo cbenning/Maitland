@@ -31,6 +31,7 @@ MONITOR_XS_REPORT_READY_PATH = "/ready"
 MONITOR_XS_REPORT_DOMID_PATH = "/domid"
 MONITOR_XS_REPORT_PID_PATH = "/pid"
 MONITOR_DEVICE = "/dev/"+MONITOR_DEVICE_NAME
+MONITOR_DUMP_DIR = "/home/malware/monitor/"
 
 
 #Commands
@@ -188,19 +189,21 @@ def watch_domain_report(path, xs):
         
         print "Reported"     
         
-        print "Dumping memory"   
-        #f1 = open(MONITOR_DEVICE,'rb')
-        print "1"   
-        #filename = "dump_"+str(time.time())+".bin"
-        print "2"
-        #f2 = open("/home/malware/monitor/"+str(filename),"wb")
-        print "3"
-        #tmp = f1.read()
-        print "4"
-        #f2.write(tmp)
-        print "5"
-        #f1.close()
-        #f2.close()
+        print "Dumping memory"
+        f1 = open(MONITOR_DEVICE,"rb")
+	filename = MONITOR_DUMP_DIR+""+str(pid)+"_dump.bin"
+	f2 = open(filename,"wb")
+
+	tmp = f1.read(1096)
+	index = 1096
+	while(tmp):
+		f2.write(tmp)
+		f1.seek(1096+index)
+		tmp = f1.read(1096)
+		index = index+1096
+        
+        f1.close()
+        f2.close()
         
         #remove watch
         return False

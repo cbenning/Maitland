@@ -69,6 +69,8 @@
 
 //File IO, Gross I know, remove this
 #include <linux/fcntl.h>
+#include <linux/file.h>
+
 
 //Custom Includes
 #include "malpage.h"
@@ -479,7 +481,8 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 	int end_pte = (PAGE_SIZE/sizeof(pte_t));
 	
 	//Temp vars
-	int none, present, bad, file, huge;
+	int none, present, bad;
+	//int file, huge;
 	int pgd_count;
 	int pmd_count;
 	int pte_count;
@@ -1107,17 +1110,9 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	//struct request_t *req;
 	process_report_t *rep;
 	struct pid *taskpid;
-	//int notify;
 	int i;
-	//int j;
 	struct task_struct *task;
-	//gref_list_t* new_list;
-	//unsigned int tempInt;
-	//unsigned int tempPFN;
-	//unsigned int *last_link;
 
-	//Get task_struct for given pid
-	//task = find_task_by_vpid(procID);
 
 	for_each_process(task) {
 		if ( task->pid == procID) {
@@ -1133,10 +1128,9 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	#endif
 	malpage_halt_process(task);
 
-	//Generate and store report
+	//Generate report
 	rep = malpage_generate_report(task);
 	rep->domid = info->domid;
-	//malpage_store_report(rep);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "DomU: Report Generated:\n");
@@ -1167,98 +1161,70 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	}
 
 	#ifdef MALPAGE_DEBUG
+	malpage_dump_file(rep);
+	#endif
+
+	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "Storing report in XS\n");
 	#endif
 
 	malpage_xs_report(rep);
 
-	/*
-	tempInt = get_zeroed_page(0); //Get an empty page
-	new_list = (gref_list_t*)(&tempInt); //Interpret the page as a gref_list_t
-	tempPFN = virt_to_pfn((void*)new_list);  //get the pfn
-	rep->first_gref = malpage_grant_mfn(tempPFN);  //grant it, put the gref in the report
-	*/
-
-	/*
-	last_link = &(rep->first_gref);
-
-	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "1\n");
-	#endif
-	
-
-	for ( i = 0; i < rep->pfn_list_length; i++) {
-		//Populate the gref list
-
-
-		#ifdef MALPAGE_DEBUG
-		printk(KERN_EMERG "2\n");
-		#endif
-		if(i%MALPAGE_GREF_PAGE_COUNT==0){  //If we come to the end of a page boundary
-				//tempPage = alloc_page(0);
-				tempInt = get_zeroed_page(0); //Get an empty page
-
-				#ifdef MALPAGE_DEBUG
-				printk(KERN_EMERG "3\n");
-				#endif
-				new_list = (gref_list_t*)(&tempInt); //Interpret the page as a gref_list_t
-				tempPFN = virt_to_mfn((void*)new_list);  //get the pfn
-				#ifdef MALPAGE_DEBUG
-				printk(KERN_EMERG "4\n");
-				#endif
-				*(last_link) = malpage_grant_mfn(tempPFN);  //grant it, note the gref
-				#ifdef MALPAGE_DEBUG
-				printk(KERN_EMERG "5\n");
-				#endif
-				last_link = &(new_list->next_gref); //advance the pointer
-		}
-		#ifdef MALPAGE_DEBUG
-		printk(KERN_EMERG "6\n");
-		#endif
-		new_list->gref_list[(i%MALPAGE_GREF_PAGE_COUNT)] = rep->gref_list[i];
-		#ifdef MALPAGE_DEBUG
-		printk(KERN_EMERG "7\n");
-		#endif
-	}
-	*(last_link) = 0;  //put a zero so we know there are no more gref lists
-
-
-	tempInt = get_zeroed_page(0); //Get an empty page
-	int firstInt = 142;
-	int lastInt = 2689;
-	new_list = (gref_list_t*)(&tempInt);
-	
-	memcpy(new_list,&firstInt,sizeof(int));
-	memcpy(new_list+(PAGE_SIZE-sizeof(int)),&lastInt,sizeof(int));
-	
-	tempPFN = virt_to_mfn((void*)new_list);  //get the pfn
-	*(last_link) = malpage_grant_mfn(tempPFN);  //grant it, note the gref
-	
-	*/
-
-	//Get an empty request
-
-	/*
-	req = RING_GET_REQUEST(&(info->fring), info->fring.req_prod_pvt);
-	req->operation = MALPAGE_RING_REPORT;
-
-	//Put our generated report into the ring
-	req->report = *rep;
-	info->fring.req_prod_pvt += 1;
-
-	//Send event
-	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(info->fring), notify);
-    if (notify) {
-          printk("\nSent a req to Dom0\n");
-          notify_remote_via_irq(info->evtchn);
-    } else {
-          printk("\nNo notify req to Dom0\n");
-          notify_remote_via_irq(info->evtchn);
-    }
-    printk(KERN_ALERT "2\n");
-    */
 	return 0;
 
+}
+
+static int malpage_dump_file(process_report_t *rep){
+	
+	char* dump_filename;
+	struct file *file;
+	int fd;
+	int i;
+	void* data;
+	loff_t pos = 0;
+	mm_segment_t old_fs;
+
+	dump_filename = kzalloc(strlen(MALPAGE_DUMP_FILENAME)+10,0);
+	sprintf(dump_filename, MALPAGE_DUMP_FILENAME, rep->process_id);
+	printk(KERN_ALERT "Debugging Enabled, Dumping process memory to %s\n",dump_filename);
+	
+	old_fs = get_fs();
+	set_fs(get_ds());
+//	fd = sys_open(dump_filename, O_WRONLY|O_CREAT, 0644);
+//	if (fd >= 0) {
+
+	file = filp_open(dump_filename, O_WRONLY|O_CREAT, 0644);
+
+	if(file){
+	
+		//Loop over each PFN
+		for(i=0; i < rep->pfn_list_length; i++){
+		
+			//ignore any that reference the null page
+			if(rep->pfn_list[i] == 0){
+				continue;
+			}
+			
+			data = pfn_to_kaddr(rep->pfn_list[i]);
+			
+			if(data==NULL){
+				continue;
+			}
+	
+			//Write
+			printk(KERN_ALERT "Writing page: %d\n",i);		
+
+	   		vfs_write(file, data, PAGE_SIZE, &pos);
+			pos = pos+PAGE_SIZE;
+			
+		}
+		filp_close(file,NULL);
+	}
+	set_fs(old_fs);
+
+	kfree(dump_filename);
+
+	return 0;
 }
 
 static int malpage_op_process(unsigned int op, unsigned int pid){

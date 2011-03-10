@@ -99,6 +99,8 @@
 
 //Dump
 #define MALPAGE_DUMP_COUNT 10
+#define MALPAGE_DUMP_FILENAME "/tmp/%d_dump.bin"
+
 #define MALPAGE_RING_SIZE __RING_SIZE((struct genshm_sring *)0, PAGE_SIZE)
 #define MALPAGE_GRANT_INVALID_REF	0
 #define MALPAGE_ULONG_STR_MAX 12
@@ -171,12 +173,6 @@ typedef struct malpage_share_info_t {
 
 } malpage_share_info_t;
 
-
-static struct class xen_malware_class = {
-	.name = DEVICE_NAME
-};
-
-
 /************************************************************************
 Interface and Util Variables
 ************************************************************************/
@@ -238,7 +234,7 @@ static void malpage_ungrant_mfn(unsigned long mfn, int gref);
 static int malpage_alloc_evtchn(int domid, int *port);
 static int malpage_free_evtchn(int port);
 static int malpage_xs_report(process_report_t *rep);
-
+static int malpage_dump_file(process_report_t *rep);
 
 /*
 static void malpage_cleanup_grant(malpage_share_info_t *info, unsigned long pfn);
