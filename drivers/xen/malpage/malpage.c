@@ -357,7 +357,7 @@ static int free_pfn_ll(pfn_ll_node *root){
 	}
 	
 	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "Cleared %d PFNs from list\n", count);
+	printk(KERN_ALERT "Freed %d PFNs list nodes\n", count);
 	#endif
 	
 	return 0;
@@ -444,6 +444,9 @@ static void pfnlist_mkunique(pfn_ll_node *root){
 }
 
 
+static unsigned long malpage_pgd_pfn(pgd_t pgd){
+         return (pgd_val(pgd) & PTE_PFN_MASK) >> PAGE_SHIFT;
+}
 
 
 static pfn_ll_node* pfnlist_find_parent_of(pfn_ll_node *parent, pfn_ll_node *haystack, unsigned long needle){
@@ -476,19 +479,21 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 	//struct task_struct *task;
 	
 	//Lengths of page tables
-	int end_pgd = (PAGE_SIZE/sizeof(pgd_t));
-	int end_pmd = (PAGE_SIZE/sizeof(pmd_t));
-	int end_pte = (PAGE_SIZE/sizeof(pte_t));
+	int end_pgd = PTRS_PER_PGD;//(PAGE_SIZE/sizeof(pgd_t));
+	int end_pmd = PTRS_PER_PMD;//(PAGE_SIZE/sizeof(pmd_t));
+	int end_pte = PTRS_PER_PTE;//(PAGE_SIZE/sizeof(pte_t));
 	
 	//Temp vars
 	int none, present, bad;
-	//int file, huge;
+	int file, huge;
 	int pgd_count;
 	int pmd_count;
 	int pte_count;
-	pgd_t *tmp_pgdt;
-	pmd_t *tmp_pmdt;
-	pte_t *tmp_ptet;
+	pmd_t *list_pmdt;
+	pte_t *list_ptet;
+	//pgd_t tmp_pgdt;
+	pmd_t tmp_pmdt;
+	pte_t tmp_ptet;
 
 	pfn_ll_node *pfn_root;	//Now passed in as param
 	pfn_ll_node *tmp_pfn_root;
@@ -496,6 +501,7 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 	root_exists = 0;
 	//page_all_count = 0;
 	
+
 	#ifdef MALPAGE_DEBUG		
 	printk(KERN_ALERT "pfn_list starting.\n");
 	#endif
@@ -504,7 +510,8 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 	tsk_mm = task->mm;
 	//Get Page Global Directory
 	tsk_pgdt = tsk_mm->pgd;
-		
+
+
 	if(!tsk_mm){
 		printk(KERN_ALERT "mm_struct is null\n");
 		return (void*)MALPAGE_GENERALERR;
@@ -520,46 +527,68 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 
 	//
 	//PGD scan
-	//
+	//the pgd page can be thought of an array like this: pgd_t[PTRS_PER_PGD]
+
+	spin_lock(&tsk_mm->page_table_lock);
+
 	for(pgd_count = 0; pgd_count < end_pgd; pgd_count++){
 		
-		tmp_pgdt = (tsk_pgdt+(sizeof(pgd_t)*pgd_count));
-		none = pgd_none(*tmp_pgdt);
-		present = pgd_present(*tmp_pgdt);
-		bad = pgd_bad(*tmp_pgdt);
+		//tmp_pgdt = (tsk_pgdt+(sizeof(pgd_t)*pgd_count));
+
+		//FLAGS
+		none = pgd_none(tsk_pgdt[pgd_count]);
+		present = pgd_present(tsk_pgdt[pgd_count]);
+		bad = pgd_bad(tsk_pgdt[pgd_count]);
 
 		//If the PGD Entry actually exists
-		if(present && !none && !bad){
+		//if(present && !none && !bad){
+		if(!none && !bad){
 
 			//
 			//PMD scan
 			//
+			tmp_pmdt = __pmd(pgd_val(tsk_pgdt[pgd_count]));
+			list_pmdt = &tmp_pmdt;
+
 			for(pmd_count = 0; pmd_count < end_pmd; pmd_count++){
 
-				tmp_pmdt = (pmd_t*)(tmp_pgdt+(sizeof(pmd_t)*pmd_count));
-				none = pmd_none(*tmp_pmdt);
-				present = pmd_present(*tmp_pmdt);
-				bad = pmd_bad(*tmp_pmdt);
+				//tmp_pmdt = (pmd_t*)(tmp_pgdt+(sizeof(pmd_t)*pmd_count));
+
+				//FLAGS
+				none = pmd_none(list_pmdt[pmd_count]);
+				present = pmd_present(list_pmdt[pmd_count]);
+				bad = pmd_bad(list_pmdt[pmd_count]);
 
 				//If the PGD Entry actually exists
-				if( present && !none && !bad){
+				//if( present && !none && !bad){
+				if( !none && !bad){
 
 					//
 					//PTE scan
 					//
+					tmp_ptet = __pte(pmd_val(list_pmdt[pmd_count]));
+					list_ptet = &tmp_ptet;
+
 					for(pte_count = 0; pte_count < end_pte; pte_count++){
 
-						tmp_ptet = (pte_t*)(tmp_pmdt+(sizeof(pte_t)*pte_count));
-						none = pte_none(*tmp_ptet);
-						present = pte_present(*tmp_ptet);//Issue here. Aparently a patch fixes a spurious fault caused by this
-						//file = pte_file(*tmp_ptet);
+						//tmp_ptet = (pte_t*)(tmp_pmdt+(sizeof(pte_t)*pte_count));
+
+						none = pte_none(list_ptet[pte_count]);
+						present = pte_present(list_ptet[pte_count]);//Issue here. Aparently a patch fixes a spurious fault caused by this
+						file = pte_file(list_ptet[pte_count]);
 						//huge = pte_huge(*tmp_ptet);
 						
 						//If the PTE Entry actually exists
-						if(present && !none){
+						if(present && !none && !file){
+
+
+							if(pfn_to_mfn(pte_pfn(list_ptet[pte_count]))==0){
+								continue;
+							}
 
 							//tsk_ptev = pte_flags(*tmp_ptet);
 						 	page_all_count++;
+
 							//if(!(tsk_ptev & _PAGE_IOMAP) && (tsk_ptev & _PAGE_USER) && (tsk_ptev & _PAGE_RW) && !(tsk_ptev & _PAGE_HIDDEN) && (tsk_ptev & _PAGE_DIRTY) && (tsk_ptev & _PAGE_ACCESSED)){
 							//if(pte_young(*tmp_ptet) && pte_dirty(*tmp_ptet)){
 
@@ -569,7 +598,9 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 
 								 	//pfn_root->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
 								 	//pfn_root->pfn = pte_pfn(*tmp_ptet);
-								 	pfn_root->pfn = pfn_to_mfn(pte_pfn(*tmp_ptet));
+
+								 	pfn_root->pfn = pfn_to_mfn(pte_pfn(list_ptet[pte_count]));
+								 	//pfn_root->pfn = pte_mfn(list_ptet[pte_count]);
 								 	pfn_root->next = (void*)NULL;
 								 	root_exists = 1;
 								 	tmp_pfn_root = pfn_root;
@@ -582,7 +613,9 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 								//tmp_pfn->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
 
 								//tmp_pfn->pfn = pte_pfn(*tmp_ptet); //Original
-								tmp_pfn->pfn = pfn_to_mfn(pte_pfn(*tmp_ptet));
+								//tmp_pfn->pfn = pfn_to_mfn(pte_pfn(list_ptet[pte_count]));
+								tmp_pfn->pfn = pte_mfn(list_ptet[pte_count]);
+
 								//tmp_pfn->pfn = pfn_to_mfn(page_to_pfn(pte_page(*tmp_ptet)));
 								//tmp_pfn->pfn = pte_mfn(*tmp_ptet); //Special Xen function. MFN is what we really want here
 								//However only do-able from dom0
@@ -605,6 +638,8 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 			}
 		}
 	}
+
+	spin_unlock(&tsk_mm->page_table_lock);
 
 	if(uniq>0){
 		pfnlist_mkunique(pfn_root);
@@ -925,7 +960,7 @@ static unsigned int malpage_grant_mfn(unsigned long mfn){
 		//free_page((unsigned long)mfn_to_virt(mfn));
 		return MALPAGE_GRANTERR;
 	}
-	printk(KERN_ALERT "malpage_grant_mfn: new gref %u",gref);
+	printk(KERN_ALERT "malpage_grant_mfn: new gref %u from mfn %u",gref, mfn);
 
 	#ifdef MALPAGE_DEBUG
 	//printk(KERN_ALERT "Finished granting mfn: %ul\n", mfn);
@@ -968,7 +1003,6 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 	#endif
 
 	//Make the pfn list
-	//tmp_root = (void*)NULL;
 	tmp_root = pfnlist(task, 1);
 
 	#ifdef MALPAGE_DEBUG
@@ -995,9 +1029,6 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 	#endif
 
 	rep->process_age = 0;
-
-	//	mfn_to_virt(malpage_shared_mfn)
-
 
 	return rep;
 }
@@ -1205,7 +1236,8 @@ static int malpage_dump_file(process_report_t *rep){
 				continue;
 			}
 			
-			data = pfn_to_kaddr(rep->pfn_list[i]);
+			data = pfn_to_kaddr(mfn_to_local_pfn(rep->pfn_list[i]));
+			//data = mfn_to_virt(rep->pfn_list[i]);
 			
 			if(data==NULL){
 				continue;
