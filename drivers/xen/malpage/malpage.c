@@ -476,31 +476,38 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 	//pteval_t tsk_ptev;
 	int root_exists;
 	int page_all_count;
+	unsigned long tmp;
 	//struct task_struct *task;
 	
 	//Lengths of page tables
-	int end_pgd = PTRS_PER_PGD;//(PAGE_SIZE/sizeof(pgd_t));
-	int end_pmd = PTRS_PER_PMD;//(PAGE_SIZE/sizeof(pmd_t));
-	int end_pte = PTRS_PER_PTE;//(PAGE_SIZE/sizeof(pte_t));
+	int end_pgd = PTRS_PER_PGD;//(PAGE_SIZE/sizeof(pgd_t));  //512
+	int end_pmd = PTRS_PER_PMD;//(PAGE_SIZE/sizeof(pmd_t));  //512
+	int end_pte = PTRS_PER_PTE;//(PAGE_SIZE/sizeof(pte_t));  //512
 	
 	//Temp vars
-	int none, present, bad;
-	int file, huge;
+	//int none, present, bad, file;
+	//int huge;
 	int pgd_count;
 	int pmd_count;
 	int pte_count;
-	pmd_t *list_pmdt;
-	pte_t *list_ptet;
-	//pgd_t tmp_pgdt;
-	pmd_t tmp_pmdt;
-	pte_t tmp_ptet;
+	//pmd_t *list_pmdt;
+	//pte_t *list_ptet;
+	pmd_t *first_pmdt;
+	pte_t *first_ptet;
+	pgd_t *tmp_pgdt;
+	pmd_t *tmp_pmdt;
+	pte_t *tmp_ptet;
 
-	pfn_ll_node *pfn_root;	//Now passed in as param
+	//unsigned long garbage;
+
+	int pte_valid, pte_skip, pmd_valid, pmd_skip, pgd_valid, pgd_skip = 0;
+
+	pfn_ll_node *pfn_root;
 	pfn_ll_node *tmp_pfn_root;
 	pfn_ll_node *tmp_pfn;
 	root_exists = 0;
-	//page_all_count = 0;
-	
+	page_all_count = 0;
+
 
 	#ifdef MALPAGE_DEBUG		
 	printk(KERN_ALERT "pfn_list starting.\n");
@@ -522,120 +529,131 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 	}
 
 	#ifdef MALPAGE_DEBUG		
-	printk(KERN_ALERT "pfn_list beginning scan.\n");
+	printk(KERN_ALERT "pfn_list beginning scan.\nPTRS_PER_PGD:%d\nPTRS_PER_PMD:%d\nPTRS_PER_PTE:%d\n",PTRS_PER_PGD,PTRS_PER_PMD,PTRS_PER_PTE);
 	#endif
 
 	//
 	//PGD scan
-	//the pgd page can be thought of an array like this: pgd_t[PTRS_PER_PGD]
+	//
 
 	spin_lock(&tsk_mm->page_table_lock);
 
 	for(pgd_count = 0; pgd_count < end_pgd; pgd_count++){
 		
-		//tmp_pgdt = (tsk_pgdt+(sizeof(pgd_t)*pgd_count));
-
-		//FLAGS
-		none = pgd_none(tsk_pgdt[pgd_count]);
-		present = pgd_present(tsk_pgdt[pgd_count]);
-		bad = pgd_bad(tsk_pgdt[pgd_count]);
+		tmp_pgdt = (tsk_pgdt+(sizeof(pgd_t*)*pgd_count));
+		printk(KERN_ALERT "1\n");
 
 		//If the PGD Entry actually exists
-		//if(present && !none && !bad){
-		if(!none && !bad){
+		if(!tmp_pgdt->pgd || !pgd_present(*tmp_pgdt) || pgd_none(*tmp_pgdt)){
+			pgd_skip++;
+			continue;
+		}
+		pgd_valid++;
 
-			//
-			//PMD scan
-			//
-			tmp_pmdt = __pmd(pgd_val(tsk_pgdt[pgd_count]));
-			list_pmdt = &tmp_pmdt;
+		/*
+		pgd_none(*tmp_pgdt)
+		pgd_bad(*tmp_pgdt)
+		!pgd_present(*tmp_pgdt)
+		*/
 
-			for(pmd_count = 0; pmd_count < end_pmd; pmd_count++){
+		//
+		//PMD scan
+		//
+		first_pmdt = (pmd_t*)pgd_page_vaddr(*tmp_pgdt);
+		printk(KERN_ALERT "2\n");
+		for(pmd_count = 0; pmd_count < end_pmd; pmd_count++){
 
-				//tmp_pmdt = (pmd_t*)(tmp_pgdt+(sizeof(pmd_t)*pmd_count));
+			//garbage = pmd_val((tmp_pgdt);
+			//tmp_pmdt = (pmd_t*)(tmp_pgdt+(sizeof(pmd_t*)*pmd_count));
+			tmp_pmdt = first_pmdt+(sizeof(pmd_t*)*pmd_count);
+			printk(KERN_ALERT "3 %lu\n",tmp_pmdt->pmd);
 
-				//FLAGS
-				none = pmd_none(list_pmdt[pmd_count]);
-				present = pmd_present(list_pmdt[pmd_count]);
-				bad = pmd_bad(list_pmdt[pmd_count]);
-
-				//If the PGD Entry actually exists
-				//if( present && !none && !bad){
-				if( !none && !bad){
-
-					//
-					//PTE scan
-					//
-					tmp_ptet = __pte(pmd_val(list_pmdt[pmd_count]));
-					list_ptet = &tmp_ptet;
-
-					for(pte_count = 0; pte_count < end_pte; pte_count++){
-
-						//tmp_ptet = (pte_t*)(tmp_pmdt+(sizeof(pte_t)*pte_count));
-
-						none = pte_none(list_ptet[pte_count]);
-						present = pte_present(list_ptet[pte_count]);//Issue here. Aparently a patch fixes a spurious fault caused by this
-						file = pte_file(list_ptet[pte_count]);
-						//huge = pte_huge(*tmp_ptet);
-						
-						//If the PTE Entry actually exists
-						if(present && !none && !file){
-
-
-							if(pfn_to_mfn(pte_pfn(list_ptet[pte_count]))==0){
-								continue;
-							}
-
-							//tsk_ptev = pte_flags(*tmp_ptet);
-						 	page_all_count++;
-
-							//if(!(tsk_ptev & _PAGE_IOMAP) && (tsk_ptev & _PAGE_USER) && (tsk_ptev & _PAGE_RW) && !(tsk_ptev & _PAGE_HIDDEN) && (tsk_ptev & _PAGE_DIRTY) && (tsk_ptev & _PAGE_ACCESSED)){
-							//if(pte_young(*tmp_ptet) && pte_dirty(*tmp_ptet)){
-
-								//Set root if we havent already
-								if(!root_exists){
-								 	pfn_root = kmalloc(sizeof(pfn_ll_node),0);
-
-								 	//pfn_root->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
-								 	//pfn_root->pfn = pte_pfn(*tmp_ptet);
-
-								 	pfn_root->pfn = pfn_to_mfn(pte_pfn(list_ptet[pte_count]));
-								 	//pfn_root->pfn = pte_mfn(list_ptet[pte_count]);
-								 	pfn_root->next = (void*)NULL;
-								 	root_exists = 1;
-								 	tmp_pfn_root = pfn_root;
-
-								 	continue;
-								}
-
-								tmp_pfn = kmalloc(sizeof(pfn_ll_node),0);
-								//Assign current node to the one we just found
-								//tmp_pfn->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
-
-								//tmp_pfn->pfn = pte_pfn(*tmp_ptet); //Original
-								//tmp_pfn->pfn = pfn_to_mfn(pte_pfn(list_ptet[pte_count]));
-								tmp_pfn->pfn = pte_mfn(list_ptet[pte_count]);
-
-								//tmp_pfn->pfn = pfn_to_mfn(page_to_pfn(pte_page(*tmp_ptet)));
-								//tmp_pfn->pfn = pte_mfn(*tmp_ptet); //Special Xen function. MFN is what we really want here
-								//However only do-able from dom0
-
-								tmp_pfn->next = (void*)NULL;
-
-								//#ifdef MALPAGE_DEBUG
-								//printk(KERN_ALERT "found pfn: %lu\n",tmp_pfn->pfn);
-								//#endif
-
-								//Attach it to the current root
-								tmp_pfn_root->next = tmp_pfn;
-								//Advance the pointer
-								tmp_pfn_root = tmp_pfn_root->next;
-							//}
-
-						}	
-					}
-				}	
+			//If the PMD Entry actually exists
+			if(!tmp_pmdt->pmd || !pmd_present(*tmp_pmdt) || pmd_none(*tmp_pmdt)){
+				pmd_skip++;
+				continue;
 			}
+			pmd_valid++;
+			/*
+			!pmd_present(*tmp_pmdt)
+			pmd_bad(*tmp_pmdt)
+			pmd_none(*tmp_pmdt)
+			*/
+			printk(KERN_ALERT "3.2\n");
+			//
+			//PTE scan
+			//
+			first_ptet = (pte_t*)pmd_page_vaddr(*tmp_pmdt);
+
+
+			printk(KERN_ALERT "4\n");
+			for(pte_count = 0; pte_count < end_pte; pte_count++){
+
+				printk(KERN_ALERT "4.0: %d\n",pte_count);
+
+				tmp_ptet = first_ptet+(sizeof(pte_t*)*pte_count);
+
+				printk(KERN_ALERT "4.1 %lu\n",tmp_ptet->pte);
+				//If the PTE Entry actually exists
+				if(!tmp_ptet->pte || !pte_present(*tmp_ptet) || pte_file(*tmp_ptet)){
+					pte_skip++;
+					continue;
+				}
+
+				pte_valid++;
+				printk(KERN_ALERT "4.3, pte_valid: %d\n",pte_valid);
+
+				/*
+				pte_none(*tmp_ptet)
+				pte_file(*tmp_ptet)
+				!pte_present(*tmp_ptet)
+				*/
+				//tmp_ptet = pfn_to_kaddr(pte_pfn(*(((pte_t*)tmp_pmdt)+(sizeof(pte_t*)*pte_count))));
+
+				//tmp_pfn->pfn = pteval_to_pfn(tmp_ptet->pte); //This will extract the PFN from the pteval_t
+				//tmp_pfn->pfn = pte_pfn(*tmp_ptet); //Original
+				//tmp_pfn->pfn = pfn_to_mfn(pte_pfn(list_ptet[pte_count]));
+				tmp = pfn_to_mfn(pte_pfn(*tmp_ptet));
+				//tmp = pte_mfn(list_ptet[pte_count]);
+				//tmp = get_phys_to_machine(pte_pfn(list_ptet[pte_count]));//Xen x86 Function
+				printk(KERN_ALERT "4.4\n");
+				if(tmp==0){
+					continue;
+				}
+
+				#ifdef MALPAGE_DEBUG
+				//unsigned long tmp2 = pte_pfn(list_ptet[pte_count]);
+				//unsigned long tmp3 = pte_mfn(list_ptet[pte_count]);
+
+				//printk(KERN_ALERT "found mfn: %lu, %lu, %lu\n",tmp, tmp2, tmp3);
+				#endif
+
+				page_all_count++;
+
+				//Set root if we havent already
+				if(!root_exists){
+					pfn_root = kmalloc(sizeof(pfn_ll_node),0);
+					pfn_root->pfn = tmp;
+					//pfn_root->pfn = pte_mfn(list_ptet[pte_count]);
+					pfn_root->next = (void*)NULL;
+					root_exists = 1;
+					tmp_pfn_root = pfn_root;
+					continue;
+				}
+
+				tmp_pfn = kmalloc(sizeof(pfn_ll_node),0);
+				//Assign current node to the one we just found
+				tmp_pfn->pfn = tmp;
+				tmp_pfn->next = (void*)NULL;
+
+				//Attach it to the current root
+				tmp_pfn_root->next = tmp_pfn;
+				//Advance the pointer
+				tmp_pfn_root = tmp_pfn_root->next;
+
+			}
+
+
 		}
 	}
 
@@ -647,9 +665,9 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 
 
 
-	#ifdef MALPAGE_DEBUG		
+	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "pfn_list done, returning.\n");
-	printk(KERN_ALERT "found %d pfns.\n",page_all_count);
+	printk(KERN_ALERT "found %d pfns.\nskipped: pdg:%d, pmd:%d, pte:%d\nvalid: pdg:%d, pmd:%d, pte:%d\n",page_all_count,pgd_skip,pmd_skip,pte_skip,pgd_valid,pmd_valid,pte_valid);
 	#endif
 	
 	return pfn_root;
@@ -841,6 +859,11 @@ static void malpage_deregister(malpage_share_info_t *info){
 }
 */
 
+static unsigned long malpage_init_grant(){
+
+}
+
+
 static unsigned long malpage_setup_ring(malpage_share_info_t *info){
 
 	struct as_sring *sring;
@@ -950,8 +973,7 @@ static unsigned int malpage_grant_mfn(unsigned long mfn){
 
 	unsigned int gref;
 
-	//printk(KERN_ALERT "malpage_grant_mfn: %ul",mfn);
-	gref = gnttab_grant_foreign_access(MALPAGE_DOM0_ID, mfn, 0);
+	gref = gnttab_grant_foreign_access((domid_t)MALPAGE_DOM0_ID, mfn, 1);
 
 	if (gref < 0) {
 		#ifdef MALPAGE_DEBUG
@@ -960,10 +982,9 @@ static unsigned int malpage_grant_mfn(unsigned long mfn){
 		//free_page((unsigned long)mfn_to_virt(mfn));
 		return MALPAGE_GRANTERR;
 	}
-	printk(KERN_ALERT "malpage_grant_mfn: new gref %u from mfn %u",gref, mfn);
 
 	#ifdef MALPAGE_DEBUG
-	//printk(KERN_ALERT "Finished granting mfn: %ul\n", mfn);
+	printk(KERN_ALERT "malpage_grant_mfn: new gref %u from mfn %lu",gref, mfn);
 	#endif
 
 	return gref;
