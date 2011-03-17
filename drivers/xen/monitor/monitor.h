@@ -81,6 +81,7 @@
 #define MONITOR_XENSTORE_REGISTER_NODE "register"
 
 #define MONITOR_VMSTRUCT_SIZE PAGE_SIZE*2
+#define MONITOR_GNTTAB_SIZE 10000
 
 /************************************************************************
 Module Interface and Util Structs

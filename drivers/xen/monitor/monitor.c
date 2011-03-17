@@ -102,21 +102,17 @@ static int monitor_init(void) {
 	cdev_init(&monitor_cdev, &monitor_fops);
 	monitor_cdev.owner = THIS_MODULE;
 
-
 	/* Connect the major/minor number to the cdev */
 	if (cdev_add(&monitor_cdev, monitor_dev, 1)) {
 		printk(KERN_ALERT "->monitor_init: Failed with registering the character device");
 		return 1;
 	}
 
-
 	err_dev = device_create(monitor_class, NULL,monitor_dev,"%s",DEVICE_NAME);
-
 	if (err_dev == NULL) {
 		printk(KERN_ALERT "->monitor_init: Registering the character device failed with error: %d",result);
 		return -ENODEV;
 	}
-
 	
 	#ifdef MONITOR_DEBUG
 	printk(KERN_ALERT "I was assigned major number %d\n", monitor_major);
@@ -125,8 +121,16 @@ static int monitor_init(void) {
 	#endif
 		
 	printk(KERN_ALERT "->monitor_init: Loaded.\n");
-
 	
+	//Initialize Grant Table
+	/*
+	result = gnttab_init();
+	if(result){
+		printk(KERN_ALERT "->monitor_init:  failed initializing grant table: %d\n",result);
+		//return MALPAGE_GENERALERR;
+	}
+	 */
+
 	return 0;
 }
 
@@ -248,6 +252,7 @@ static int monitor_register(monitor_share_info_t *info){
 	struct vm_struct *v_start;
 	struct gnttab_map_grant_ref ops;
 	struct gnttab_unmap_grant_ref unmap_ops;
+	//struct gnttab_setup_table setup_ops;
 
 	#ifdef MONITOR_DEBUG
 	printk(KERN_ALERT "->monitor_register: got gref:%u domid:%u\n",info->gref,info->domid);
@@ -258,9 +263,33 @@ static int monitor_register(monitor_share_info_t *info){
 		return MONITOR_ALLOCERR;
 	}
 
-	#ifdef GENSHMB_DEBUG
-	printk(KERN_ALERT "->monitor_register: got gref:%u domid:%u\n",info->gref,info->domid);
-	#endif
+	/*
+	setup_ops.dom = info->domid;
+	setup_ops.nr_frames = MONITOR_GNTTAB_SIZE;
+
+	if (HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup_ops, 1)) {
+		printk(KERN_ALERT "monitor_register: HYPERVISOR GNTTABOP_setup_table failed\n");
+		return -EFAULT;
+	}
+	if (setup_ops.status) {
+
+		#define GNTST_okay             (0)  // Normal return.
+		#define GNTST_general_error    (-1) // General undefined error.
+		#define GNTST_bad_domain       (-2) // Unrecognsed domain id.
+		#define GNTST_bad_gntref       (-3) // Unrecognised or inappropriate gntref.
+		#define GNTST_bad_handle       (-4) // Unrecognised or inappropriate handle.
+		#define GNTST_bad_virt_addr    (-5) // Inappropriate virtual address to map.
+		#define GNTST_bad_dev_addr     (-6) // Inappropriate device address to unmap.
+		#define GNTST_no_device_space  (-7) // Out of space in I/O MMU.
+		#define GNTST_permission_denied (-8) // Not enough privilege for operation.
+		#define GNTST_bad_page         (-9) // Specified page was invalid for op.
+		#define GNTST_bad_copy_arg    (-10) // copy arguments cross page boundary
+
+		printk(KERN_ALERT "->monitor_register:  HYPERVISOR GNTTABOP_setup_table status = %d\n", setup_ops.status);
+		return -EFAULT;
+	}
+*/
+
 
 	// The following function reserves a range of kernel address space and
 	// allocates pagetables to map that range. No actual mappings are created.
@@ -277,6 +306,7 @@ static int monitor_register(monitor_share_info_t *info){
 	 ops struct out parameters
 		status (zero if OK), handle (used to unmap later), dev_bus_addr
 	*/
+
 
 	//Map in the remote page
 	gnttab_set_map_op(&ops, (unsigned long)v_start->addr, GNTMAP_host_map, info->gref, info->domid);
@@ -394,7 +424,6 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					break;
 					  
 			}
-
 
 			memcpy(RING_GET_RESPONSE(&monitor_share_info->bring, monitor_share_info->bring.rsp_prod_pvt), &resp, sizeof(resp));
 			monitor_share_info->bring.rsp_prod_pvt++;
@@ -630,7 +659,11 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 	}
 
 	printk(KERN_ALERT "monitor_map_gref: HYPERVISOR mapping gref: %d\n",gref);
-	gnttab_set_map_op(&ops, (unsigned long)(v_start->addr), GNTMAP_host_map|GNTMAP_application_map, (grant_ref_t)gref, (domid_t)domid );
+
+
+
+	gnttab_set_map_op(&ops, ((unsigned long)(v_start->addr)), GNTMAP_host_map|GNTMAP_readonly, (grant_ref_t)gref, (domid_t)domid );
+	//GNTMAP_host_map|GNTMAP_application_map|GNTMAP_contains_pte|GNTMAP_readonly
 /*
 	ops.flags = GNTMAP_host_map;
 	ops.ref = gref;
@@ -648,7 +681,11 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 	}
 	else{
 		printk(KERN_ALERT "monitor_map_gref: test: %d",*((int*)v_start->addr));
+		printk("\nmonitor_map_gref: shared_page = %x, handle = %x, status = %x",(unsigned int)v_start->addr, ops.handle, ops.status);
 	}
+
+
+
 	return v_start;
 
 }
