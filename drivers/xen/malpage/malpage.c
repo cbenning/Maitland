@@ -488,11 +488,15 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task){
 	unsigned long current_vma_vm_start;
 	unsigned long current_vma_vm_end;
 	unsigned long current_vma_vm_length;
+	unsigned long current_anon_vma_vm_start;
+	unsigned long current_anon_vma_vm_end;
+	unsigned long current_anon_vma_vm_length;
 	unsigned long new_mfn;
 	struct mm_struct *tsk_mm;
 	int vma_total;
 	int vma_count;
 	struct vm_area_struct *current_vma;
+	struct vm_area_struct *current_anon_vma;
 
 
 	//Related to the linked list
@@ -502,7 +506,8 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task){
 	pfn_ll_node *pfn_root;
 	pfn_ll_node *tmp_pfn_root;
 	pfn_ll_node *tmp_pfn;
-	struct list_head node;
+	struct list_head *node;
+	struct list_head *first_node;
 
 	//Init list
 	root_exists = 0;
@@ -572,20 +577,82 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task){
 		//Now do anyonymous VMA's (this usually includes the heap)
 		anon_vma_lock(current_vma);
 
-		//
-		//node = list_first_entry(tsk_mm->
-		//
+		#ifdef MALPAGE_DEBUG
+		printk(KERN_ALERT "Looking for ANON VMA's associated with this one\n");
+		#endif
+
+		//Iterate over list entries in "linux/list.h"
+
+
+		if(!list_empty(&current_vma->anon_vma->head)){
+
+			node = kzalloc(sizeof(struct list_head),0);
+
+			printk(KERN_ALERT "1\n");
+			list_for_each(node,&current_vma->anon_vma->head){
+
+				printk(KERN_ALERT "2\n");
+				current_anon_vma = list_entry(node,struct vm_area_struct,anon_vma_node);
+
+				printk(KERN_ALERT "3\n");
+
+				//Get memory boundaries
+				current_anon_vma_vm_start = current_anon_vma_vm_end = current_anon_vma_vm_length = 0;
+				current_anon_vma_vm_start = current_anon_vma->vm_start;
+				current_anon_vma_vm_end = current_anon_vma->vm_end;
+				current_anon_vma_vm_length = current_anon_vma_vm_end-current_anon_vma_vm_start;
+
+				#ifdef MALPAGE_DEBUG
+				printk(KERN_ALERT "%s: found new ANON memory region, size:%lu, pgprot:%lu\n",__func__,current_anon_vma_vm_length,current_anon_vma->vm_page_prot.pgprot);
+				#endif
+
+				printk(KERN_ALERT "2\n");
+
+				while(current_anon_vma_vm_length>=0){
+							new_mfn = 0;
+							new_mfn = addr_to_mfn(tsk_mm,current_anon_vma_vm_end-current_anon_vma_vm_length);
+							if(new_mfn>0){
+								page_all_count++;
+								//Set root if we havent already
+								if(!root_exists){
+									pfn_root = kmalloc(sizeof(pfn_ll_node),0);
+									pfn_root->pfn = new_mfn;
+									pfn_root->next = (void*)NULL;
+									root_exists = 1;
+									tmp_pfn_root = pfn_root;
+								}
+								else{
+									tmp_pfn = kmalloc(sizeof(pfn_ll_node),0);
+									tmp_pfn->pfn = new_mfn;
+									tmp_pfn->next = (void*)NULL;
+									tmp_pfn_root->next = tmp_pfn;
+									tmp_pfn_root = tmp_pfn_root->next;
+								}
+
+							}
+							//If we just got the last addr, bail out
+							if(current_anon_vma_vm_length<=0){
+								break;
+							}
+							//Move down the line
+							current_anon_vma_vm_length-=PAGE_SIZE;
+							//If we are at the end, stay at the end
+							if(current_anon_vma_vm_length<0){
+								current_anon_vma_vm_length=0;
+							}
+						}
+				vma_count++;
+			}
+			kfree(node);
+		}
 
 		anon_vma_unlock(current_vma);
-
-
 
 		//Move up the list of VMA's
 		current_vma = current_vma->vm_next;
 		vma_count++;
 
-	}while(current_vma);
-	//while(vma_count<vma_total);
+	}while(current_vma && vma_count<vma_total);
 
 	spin_unlock(&tsk_mm->page_table_lock);
 
