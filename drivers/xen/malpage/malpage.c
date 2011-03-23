@@ -487,16 +487,24 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task){
 	//Related to the VMA stuff
 	unsigned long current_vma_vm_start;
 	unsigned long current_vma_vm_end;
-	unsigned long current_vma_vm_length;
+	long current_vma_vm_length;
 	unsigned long current_anon_vma_vm_start;
 	unsigned long current_anon_vma_vm_end;
-	unsigned long current_anon_vma_vm_length;
+	long current_anon_vma_vm_length;
+	long heap_length;
+	long code_length;
+	long data_length;
+
 	unsigned long new_mfn;
 	struct mm_struct *tsk_mm;
 	int vma_total;
 	int vma_count;
+	int heap_count;
+	int data_count;
+	int code_count;
 	struct vm_area_struct *current_vma;
 	struct vm_area_struct *current_anon_vma;
+	//struct anon_vma *current_anon_vma;
 
 
 	//Related to the linked list
@@ -523,11 +531,16 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task){
 	current_vma = tsk_mm->mmap;
 
 	vma_count=0;
-	spin_lock(&tsk_mm->page_table_lock);
+
+
+
+	while(mm_take_all_locks(tsk_mm)){}
+	//spin_lock(&tsk_mm->page_table_lock);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "%s: Process memory stats, total_vm:%lu, locked_vm:%lu, shared_vm:%lu, exec_vm:%lu, stack_vm:%lu, reserved_vm:%lu\n",__func__, tsk_mm->total_vm, tsk_mm->locked_vm, tsk_mm->shared_vm, tsk_mm->exec_vm, tsk_mm->stack_vm, tsk_mm->reserved_vm);
 	#endif
+
 
 	do{
 		//Get memory boundaries
@@ -574,33 +587,41 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task){
 			}
 		}
 
+
 		//Now do anyonymous VMA's (this usually includes the heap)
-		anon_vma_lock(current_vma);
+		//anon_vma_lock(current_vma); //spin_lock(&current_vma->anon_vma->lock);
+
 
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "Looking for ANON VMA's associated with this one\n");
 		#endif
 
 		//Iterate over list entries in "linux/list.h"
+		if(!list_empty(&current_vma->anon_vma_node)){
 
-
-		if(!list_empty(&current_vma->anon_vma->head)){
-
-			node = kzalloc(sizeof(struct list_head),0);
+			//node = kzalloc(sizeof(struct list_head),0);
 
 			printk(KERN_ALERT "1\n");
-			list_for_each(node,&current_vma->anon_vma->head){
+			__list_for_each(node, &current_vma->anon_vma->head){
 
 				printk(KERN_ALERT "2\n");
-				current_anon_vma = list_entry(node,struct vm_area_struct,anon_vma_node);
 
-				printk(KERN_ALERT "3\n");
+				current_anon_vma = list_entry(node,struct vm_area_struct,anon_vma_node);
+				//current_anon_vma = list_entry(node,struct anon_vma,head);
+
+				if(!current_anon_vma){
+					continue;
+				}
 
 				//Get memory boundaries
 				current_anon_vma_vm_start = current_anon_vma_vm_end = current_anon_vma_vm_length = 0;
+				printk(KERN_ALERT "3\n");
 				current_anon_vma_vm_start = current_anon_vma->vm_start;
+				printk(KERN_ALERT "4\n");
 				current_anon_vma_vm_end = current_anon_vma->vm_end;
+				printk(KERN_ALERT "5\n");
 				current_anon_vma_vm_length = current_anon_vma_vm_end-current_anon_vma_vm_start;
+
 
 				#ifdef MALPAGE_DEBUG
 				printk(KERN_ALERT "%s: found new ANON memory region, size:%lu, pgprot:%lu\n",__func__,current_anon_vma_vm_length,current_anon_vma->vm_page_prot.pgprot);
@@ -646,7 +667,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task){
 			kfree(node);
 		}
 
-		anon_vma_unlock(current_vma);
+		//anon_vma_unlock(current_vma);//spin_unlock(&current_vma->anon_vma->lock);
 
 		//Move up the list of VMA's
 		current_vma = current_vma->vm_next;
@@ -654,14 +675,105 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task){
 
 	}while(current_vma && vma_count<vma_total);
 
-	spin_unlock(&tsk_mm->page_table_lock);
 
 
-	duplicate_pages = pfnlist_mkunique(pfn_root);
+/*
+
+	#ifdef MALPAGE_DEBUG
+	printk(KERN_ALERT "%s: Examining Code Section\n",__func__);
+	#endif
+
+	code_length = tsk_mm->end_code - tsk_mm->start_code;
+	printk(KERN_ALERT "0: start:%lu, end:%lu\n", tsk_mm->start_code,tsk_mm->end_code);
+	code_count = 0;
+
+	while(code_length>=0){
+
+		new_mfn = 0;
+		new_mfn = addr_to_mfn(tsk_mm,tsk_mm->end_code-code_length);
+		if(new_mfn>0){
+			page_all_count++;
+			code_count++;
+			printk(KERN_ALERT "PAGE");
+			//Set root if we havent already
+			if(!root_exists){
+				pfn_root = kmalloc(sizeof(pfn_ll_node),0);
+				pfn_root->pfn = new_mfn;
+				pfn_root->next = (void*)NULL;
+				root_exists = 1;
+				tmp_pfn_root = pfn_root;
+			}
+			else{
+				tmp_pfn = kmalloc(sizeof(pfn_ll_node),0);
+				tmp_pfn->pfn = new_mfn;
+				tmp_pfn->next = (void*)NULL;
+				tmp_pfn_root->next = tmp_pfn;
+				tmp_pfn_root = tmp_pfn_root->next;
+			}
+		}
+		//If we just got the last addr, bail out
+		if(code_length<=0){
+			break;
+		}
+		//Move down the line
+		code_length-=PAGE_SIZE/1024;
+		//If we are at the end, stay at the end
+		if(code_length<0){
+			code_length=0;
+		}
+	}
+
+
+	#ifdef MALPAGE_DEBUG
+	printk(KERN_ALERT "%s: Examining Data Section\n",__func__);
+	#endif
+
+	data_length = tsk_mm->end_data - tsk_mm->start_data;
+	data_count = 0;
+	while(data_length>=0){
+		new_mfn = 0;
+		new_mfn = addr_to_mfn(tsk_mm,tsk_mm->end_data-data_length);
+		if(new_mfn>0){
+			page_all_count++;
+			data_count++;
+			//Set root if we havent already
+			if(!root_exists){
+				pfn_root = kmalloc(sizeof(pfn_ll_node),0);
+				pfn_root->pfn = new_mfn;
+				pfn_root->next = (void*)NULL;
+				root_exists = 1;
+				tmp_pfn_root = pfn_root;
+			}
+			else{
+				tmp_pfn = kmalloc(sizeof(pfn_ll_node),0);
+				tmp_pfn->pfn = new_mfn;
+				tmp_pfn->next = (void*)NULL;
+				tmp_pfn_root->next = tmp_pfn;
+				tmp_pfn_root = tmp_pfn_root->next;
+			}
+		}
+		//If we just got the last addr, bail out
+		if(data_length<=0){
+			break;
+		}
+		//Move down the line
+		data_length-=PAGE_SIZE/1024;
+		//If we are at the end, stay at the end
+		if(data_length<0){
+			data_length=0;
+		}
+	}
+*/
+	//spin_unlock(&tsk_mm->page_table_lock);
+
+	mm_drop_all_locks(tsk_mm);
+
+	//duplicate_pages = 0;
+	//duplicate_pages = pfnlist_mkunique(pfn_root);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "pfn_list done, returning.\n");
-	printk(KERN_ALERT "found %d pfns, %d were duplicates\n\n",page_all_count,duplicate_pages);
+	printk(KERN_ALERT "found %d pfns, %d heap pages, %d were duplicates\n\n",page_all_count,heap_count,duplicate_pages);
 	#endif
 
 	return pfn_root;
