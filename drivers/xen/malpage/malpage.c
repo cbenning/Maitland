@@ -511,6 +511,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 	//Related to the linked list
 	int root_exists;
 	int page_all_count;
+	int local_page_count;
 	int duplicate_pages;
 	pfn_ll_node *pfn_root;
 	pfn_ll_node *tmp_pfn_root;
@@ -552,14 +553,14 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 		current_vma_vm_start = current_vma_vm_end = current_vma_vm_length = 0;
 		current_vma_vm_start = current_vma->vm_start;
 		current_vma_vm_end = current_vma->vm_end;
-		//current_vma_vm_start = current_vma->vm_start;
-		//current_vma_vm_end = current_vma->vm_end;
 		current_vma_vm_length = current_vma_vm_end-current_vma_vm_start;
+
 
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "%s: found new memory region, size:%lu, pgprot:%lu\n",__func__,current_vma_vm_length,current_vma->vm_page_prot.pgprot);
 		#endif
 
+		local_page_count=0;
 		while(current_vma_vm_length>=0){
 			new_mfn = 0;
 			new_mfn = addr_to_mfn(tsk_mm,current_vma_vm_end-current_vma_vm_length);
@@ -581,20 +582,23 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 					tmp_pfn_root->next = tmp_pfn;
 					tmp_pfn_root = tmp_pfn_root->next;
 				}
-
+				local_page_count++;
 			}
 			//If we just got the last addr, bail out
 			if(current_vma_vm_length<=0){
 				break;
 			}
 			//Move down the line
-			current_vma_vm_length-=PAGE_SIZE/2;
+			current_vma_vm_length-=PAGE_SIZE;
 			//If we are at the end, stay at the end
 			if(current_vma_vm_length<0){
 				current_vma_vm_length=0;
 			}
 		}
 
+		#ifdef MALPAGE_DEBUG
+		printk(KERN_ALERT "	%s: found %d pages\n",__func__,local_page_count);
+		#endif
 
 		if(anon){
 
@@ -634,7 +638,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 					if(new_mfn>0){
 
 						#ifdef MALPAGE_DEBUG
-						printk(KERN_ALERT "		Found Anon VMA page\n");
+						//printk(KERN_ALERT "		Found Anon VMA page\n");
 						#endif
 
 						page_all_count++;
@@ -660,7 +664,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 						break;
 					}
 					//Move down the line
-					current_anon_vma_vm_length-=PAGE_SIZE/2;
+					current_anon_vma_vm_length-=PAGE_SIZE;
 					//If we are at the end, stay at the end
 					if(current_anon_vma_vm_length<0){
 						current_anon_vma_vm_length=0;
@@ -683,103 +687,13 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 
 
 
-
-/*
-
-	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "%s: Examining Heap Section\n",__func__);
-	#endif
-
-	code_length = tsk_mm->brk - tsk_mm->start_brk;
-	//printk(KERN_ALERT "0: start:%lu, end:%lu\n", tsk_mm->start_code,tsk_mm->end_code);
-	code_count = 0;
-
-	while(code_length>=0){
-
-		new_mfn = 0;
-		new_mfn = addr_to_mfn(tsk_mm,tsk_mm->brk-code_length);
-		if(new_mfn>0){
-			page_all_count++;
-			code_count++;
-			printk(KERN_ALERT "PAGE");
-			//Set root if we havent already
-			if(!root_exists){
-				pfn_root = kmalloc(sizeof(pfn_ll_node),0);
-				pfn_root->pfn = new_mfn;
-				pfn_root->next = (void*)NULL;
-				root_exists = 1;
-				tmp_pfn_root = pfn_root;
-			}
-			else{
-				tmp_pfn = kmalloc(sizeof(pfn_ll_node),0);
-				tmp_pfn->pfn = new_mfn;
-				tmp_pfn->next = (void*)NULL;
-				tmp_pfn_root->next = tmp_pfn;
-				tmp_pfn_root = tmp_pfn_root->next;
-			}
-		}
-		//If we just got the last addr, bail out
-		if(code_length<=0){
-			break;
-		}
-		//Move down the line
-		code_length-=PAGE_SIZE;
-		//If we are at the end, stay at the end
-		if(code_length<0){
-			code_length=0;
-		}
-	}
-
-
-	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "%s: Examining Data Section\n",__func__);
-	#endif
-
-	data_length = tsk_mm->end_data - tsk_mm->start_data;
-	data_count = 0;
-	while(data_length>=0){
-		new_mfn = 0;
-		new_mfn = addr_to_mfn(tsk_mm,tsk_mm->end_data-data_length);
-		if(new_mfn>0){
-			page_all_count++;
-			data_count++;
-			//Set root if we havent already
-			if(!root_exists){
-				pfn_root = kmalloc(sizeof(pfn_ll_node),0);
-				pfn_root->pfn = new_mfn;
-				pfn_root->next = (void*)NULL;
-				root_exists = 1;
-				tmp_pfn_root = pfn_root;
-			}
-			else{
-				tmp_pfn = kmalloc(sizeof(pfn_ll_node),0);
-				tmp_pfn->pfn = new_mfn;
-				tmp_pfn->next = (void*)NULL;
-				tmp_pfn_root->next = tmp_pfn;
-				tmp_pfn_root = tmp_pfn_root->next;
-			}
-		}
-		//If we just got the last addr, bail out
-		if(data_length<=0){
-			break;
-		}
-		//Move down the line
-		data_length-=PAGE_SIZE/1024;
-		//If we are at the end, stay at the end
-		if(data_length<0){
-			data_length=0;
-		}
-	}
-*/
-
-
 	spin_unlock(&tsk_mm->page_table_lock);
 	//Decrement Semaphore
 	up_read(&tsk_mm->mmap_sem);
 	//mm_drop_all_locks(tsk_mm);
 
 	duplicate_pages = 0;
-	//duplicate_pages = pfnlist_mkunique(pfn_root);
+	duplicate_pages = pfnlist_mkunique(pfn_root);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "pfn_list done, returning.\n");
@@ -823,7 +737,7 @@ static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr){
 	}
 
 	pte = pte_offset_kernel(pmd,addr);
-	if(!pte || !pte_present(*pte) || pte_none(*pte) || pte_file(*pte)){
+	if(!pte || !pte_present(*pte)){// || pte_none(*pte) || pte_file(*pte)
 		#ifdef MALPAGE_DEBUG
 		//printk(KERN_ALERT "%s: pte collection failed, skipping\n",__func__);
 		#endif
@@ -1362,7 +1276,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 
 	//Make the pfn list
 	//tmp_root = pfnlist(task, 1);
-	tmp_root = pfnlist_vmarea(task,1);
+	tmp_root = pfnlist_vmarea(task,0);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "Calculating number of pfns.\n");
