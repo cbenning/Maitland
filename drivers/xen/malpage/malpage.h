@@ -203,7 +203,7 @@ static void malpage_exit(void);
 static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
 //static ssize_t malpage_read_gref(struct file *filp, char __user *buffer, size_t count, loff_t *offp);
 //static ssize_t malpage_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp);
-static pfn_ll_node* pfnlist_vmarea(struct task_struct *task);
+static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon);
 static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr);
 static pfn_ll_node* pfnlist(struct task_struct *task, int uniq);
 //static void pfnlist_show(pfn_ll_node *root);
