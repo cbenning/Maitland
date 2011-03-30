@@ -207,7 +207,7 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#endif
 
 			malpage_halt_process(task);
-			pfnlist_vmarea(task,0);
+			pfnlist_vmarea(task,0,0);
 
 			return 0;
 		break;
@@ -464,7 +464,7 @@ static pfn_ll_node* pfnlist_find_parent_of(pfn_ll_node *parent, pfn_ll_node *hay
 
 
 
-static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
+static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int anon){
 
 	//Useful files:
 	//mm_types.h
@@ -506,6 +506,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 	struct vm_area_struct *current_vma;
 	struct vm_area_struct *current_anon_vma;
 	//struct anon_vma *current_anon_vma;
+	int skip;
 
 
 	//Related to the linked list
@@ -549,6 +550,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 
 
 	do{
+
 		//Get memory boundaries
 		current_vma_vm_start = current_vma_vm_end = current_vma_vm_length = 0;
 		current_vma_vm_start = current_vma->vm_start;
@@ -560,8 +562,19 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 		printk(KERN_ALERT "%s: found new memory region, size:%lu, pgprot:%lu\n",__func__,current_vma_vm_length,current_vma->vm_page_prot.pgprot);
 		#endif
 
+		skip = 0;
+		//Check if thyis is the heap
+		if(!(current_vma->vm_flags & VM_WRITE )){
+			#ifdef MALPAGE_DEBUG
+			printk(KERN_ALERT "	Ignoring, not Writable\n");
+			#endif
+			//continue;
+			skip=1;
+		}
+
+
 		local_page_count=0;
-		while(current_vma_vm_length>=0){
+		while(current_vma_vm_length>=0 && !skip){
 			new_mfn = 0;
 			new_mfn = addr_to_mfn(tsk_mm,current_vma_vm_end-current_vma_vm_length);
 			if(new_mfn>0){
@@ -619,6 +632,14 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 			//list_for_each(node, &current_vma->anon_vma->head){
 			list_for_each_entry(current_anon_vma, &current_vma->anon_vma->head, anon_vma_node){
 
+
+				//Check if thyis is the heap
+				if(!(current_anon_vma->vm_flags & VM_WRITE )){
+					#ifdef MALPAGE_DEBUG
+					printk(KERN_ALERT "	Ignoring, not Writable\n");
+					#endif
+					continue;
+				}
 				//current_anon_vma = list_entry(node,struct vm_area_struct,anon_vma_node);
 				//current_anon_vma = list_entry(node,struct anon_vma,head);
 
@@ -693,8 +714,9 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int anon){
 	//mm_drop_all_locks(tsk_mm);
 
 	duplicate_pages = 0;
-	duplicate_pages = pfnlist_mkunique(pfn_root);
-
+	if(duplicates){
+		duplicate_pages = pfnlist_mkunique(pfn_root);
+	}
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "pfn_list done, returning.\n");
 	printk(KERN_ALERT "found %d pfns, %d vmas, %d anon_vmas, %d were duplicates\n",page_all_count,vma_count,anon_vma_count,duplicate_pages);
@@ -713,7 +735,7 @@ static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr){
 
 
 	pgd = pgd_offset(mm,addr);
-	if(pgd_none(*pgd) || pgd_bad(*pgd)){
+	if(pgd_none(*pgd)){ // || pgd_bad(*pgd)
 		#ifdef MALPAGE_DEBUG
 		//printk(KERN_ALERT "%s: pgd collection failed, skipping\n",__func__);
 		#endif
@@ -721,7 +743,7 @@ static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr){
 	}
 
 	pud = pud_offset(pgd,addr);
-	if(pud_none(*pud) || pud_bad(*pud)){
+	if(pud_none(*pud)){// || pud_bad(*pud)
 		#ifdef MALPAGE_DEBUG
 		//printk(KERN_ALERT "%s: pud collection failed, skipping\n",__func__);
 		#endif
@@ -729,7 +751,7 @@ static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr){
 	}
 
 	pmd = pmd_offset(pud,addr); //Not sure if casting pgd_t* to pud_t* is valid
-	if(pmd_none(*pmd) || pmd_bad(*pmd)){
+	if(pmd_none(*pmd)){ // || pmd_bad(*pmd)
 		#ifdef MALPAGE_DEBUG
 		//printk(KERN_ALERT "%s: pmd collection failed, skipping\n",__func__);
 		#endif
@@ -737,7 +759,7 @@ static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr){
 	}
 
 	pte = pte_offset_kernel(pmd,addr);
-	if(!pte || !pte_present(*pte)){// || pte_none(*pte) || pte_file(*pte)
+	if(!pte || !pte_present(*pte) || pte_none(*pte)){//  || pte_file(*pte)
 		#ifdef MALPAGE_DEBUG
 		//printk(KERN_ALERT "%s: pte collection failed, skipping\n",__func__);
 		#endif
@@ -745,7 +767,8 @@ static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr){
 	}
 
 	//Get the MFN from the PTE
-	return pfn_to_mfn(pte_pfn(*pte));
+	//return pfn_to_mfn(pte_pfn(*pte));
+	return pte_mfn(*pte);
 
 }
 
@@ -1234,10 +1257,11 @@ static unsigned int malpage_grant_mfn(unsigned long mfn){
 		return MALPAGE_GRANTERR;
 	}
 
+	/*
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "malpage_grant_mfn: new gref %u from mfn %lu",gref, mfn);
 	#endif
-
+	 */
 	return gref;
 }
 
@@ -1276,7 +1300,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 
 	//Make the pfn list
 	//tmp_root = pfnlist(task, 1);
-	tmp_root = pfnlist_vmarea(task,0);
+	tmp_root = pfnlist_vmarea(task,1, 1);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "Calculating number of pfns.\n");
@@ -1365,7 +1389,7 @@ static int malpage_xs_report(process_report_t *rep){
 	result = xenbus_mkdir(*xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH);
 
 	pfn_str = kzalloc(strlen("18446744073709551615"),0);
-	gref_str = kzalloc(strlen("10000"),0);
+	gref_str = kzalloc(strlen("100000"),0);
 
 	for(i=0; i < rep->pfn_list_length; i ++){
 
@@ -1378,6 +1402,12 @@ static int malpage_xs_report(process_report_t *rep){
 
 		//Signal report is finished
 		result = xenbus_write(*xstrans, report_gref_path, gref_str, pfn_str);
+
+		/*
+		#ifdef MALPAGE_DEBUG
+		printk(KERN_ALERT "	->malpage_xs_report: wrote gref %d\n",i);
+		#endif
+		*/
 	}
 
 
@@ -1472,6 +1502,7 @@ static int malpage_dump_file(process_report_t *rep){
 	void* data;
 	loff_t pos = 0;
 	mm_segment_t old_fs;
+	int nulls;
 
 	dump_filename = kzalloc(strlen(MALPAGE_DUMP_FILENAME)+10,0);
 	sprintf(dump_filename, MALPAGE_DUMP_FILENAME, rep->process_id);
@@ -1485,10 +1516,12 @@ static int malpage_dump_file(process_report_t *rep){
 	if(file){
 	
 		//Loop over each PFN
+		nulls = 0;
 		for(i=0; i < rep->pfn_list_length; i++){
 		
 			//ignore any that reference the null page
 			if(rep->pfn_list[i] == 0){
+				nulls++;
 				continue;
 			}
 			
@@ -1510,7 +1543,7 @@ static int malpage_dump_file(process_report_t *rep){
 	}
 	set_fs(old_fs);
 
-	printk(KERN_ALERT "Wrote %d pages to file.\n",i);
+	printk(KERN_ALERT "Wrote %d pages to file. %d nulls\n",i,nulls);
 	kfree(dump_filename);
 
 	return 0;
