@@ -4537,6 +4537,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 /*************************
  * Writable Pagetables
  */
+//TODO
 
 struct ptwr_emulate_ctxt {
     struct x86_emulate_ctxt ctxt;
@@ -4577,6 +4578,7 @@ static int ptwr_emulated_update(
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct vcpu *v = current;
     struct domain *d = v->domain;
+
 
     /* Only allow naturally-aligned stores within the original %cr2 page. */
     if ( unlikely(((addr^ptwr_ctxt->cr2) & PAGE_MASK) || (addr & (bytes-1))) )
@@ -4681,6 +4683,9 @@ static int ptwr_emulated_update(
 
     /* Finally, drop the old PTE. */
     put_page_from_l1e(ol1e, d);
+
+
+    gdprintk(XENLOG_DEBUG, "ptwr_emulated_update: GOTHERE");
 
     return X86EMUL_OKAY;
 }
