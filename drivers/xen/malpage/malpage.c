@@ -67,11 +67,11 @@
 #include <xen/interface/callback.h>
 #include <xen/events.h>
 #include <xen/evtchn.h>
+#include <asm/xen/hypercall.h> //This is for access to the MMU_UPDATE stuff
 
 //File IO, Gross I know, remove this
 #include <linux/fcntl.h>
 #include <linux/file.h>
-
 
 //Custom Includes
 #include "malpage.h"
@@ -138,7 +138,20 @@ static int malpage_init(void) {
 	malpage_share_info = malpage_register();
 
 	printk(KERN_ALERT ">malpage_init: Registered.\n");
-
+	
+	//DANGEROUS, set the kernel mmu update intercept pointer
+	printk(KERN_ALERT ">malpage_init: setting mmu_update ptr.\n");
+	kmalpage_mmu_update = &malpage_mmu_update;
+	if(kmalpage_mmu_update==NULL){
+		printk(KERN_ALERT ">malpage_init: failed settign mmu_update ptr.\n");	
+	}
+	
+	printk(KERN_ALERT ">malpage_init: setting multi_mmu_update ptr.\n");
+	kmalpage_multi_mmu_update = &malpage_multi_mmu_update;
+	if(kmalpage_multi_mmu_update==NULL){
+		printk(KERN_ALERT ">malpage_init: failed settign multi_mmu_update ptr.\n");	
+	}
+	
 	return 0;
 }
 
@@ -167,6 +180,16 @@ static void malpage_exit(void) {
 
 
 
+static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid){
+	printk(KERN_ALERT "malpage_mmu_update:%u",domid);
+	return 0;
+}
+
+static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
+	printk(KERN_ALERT "malpage_multi_mmu_update:%u",domid);
+	return 0;
+}
+
 /*
 Lots of useful stuff in pid.h/pid.c
 */
@@ -188,6 +211,12 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			printk(KERN_ALERT "Reporting\n");
 			#endif
 			return malpage_report(procID,malpage_share_info);
+		break;
+		case MALPAGE_WATCH:
+			#ifdef MALPAGE_DEBUG
+			printk(KERN_ALERT "Watching Process\n");
+			#endif
+			return malpage_watch(procID,malpage_share_info);
 		break;
 		case MALPAGE_TEST:
 			#ifdef MALPAGE_DEBUG
@@ -1492,6 +1521,15 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 
 	return 0;
 
+}
+
+
+static int malpage_watch(pid_t procID,malpage_share_info_t *info) {
+
+
+
+
+	return 0;
 }
 
 static int malpage_dump_file(process_report_t *rep){

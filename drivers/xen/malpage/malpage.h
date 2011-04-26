@@ -74,6 +74,7 @@
 #define MALPAGE_RINGREQ MALPAGE_IOC_MAGIC+7
 #define MALPAGE_REGISTER MALPAGE_IOC_MAGIC+8
 #define MALPAGE_TEST MALPAGE_IOC_MAGIC+9
+#define MALPAGE_WATCH MALPAGE_IOC_MAGIC+10
 
 //Operations for the ring communication
 #define MALPAGE_RING_REPORT 1
@@ -183,7 +184,6 @@ static struct cdev malpage_cdev;
 static struct class* malpage_class;
 process_report_node_t *report_list;
 
-
 /************************************************************************
 Grant table and Interdomain Variables
 ************************************************************************/
@@ -201,6 +201,8 @@ Interface and Util Functions
 static int malpage_init(void);
 static void malpage_exit(void);
 static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
+static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
+static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
 //static ssize_t malpage_read_gref(struct file *filp, char __user *buffer, size_t count, loff_t *offp);
 //static ssize_t malpage_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp);
 static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates,  int anon);
@@ -217,6 +219,7 @@ static void malpage_halt_process(struct task_struct *task);
 static void malpage_resume_process(struct task_struct *task);
 static void malpage_kill_process(struct task_struct *task);
 
+
 /************************************************************************
 Grant table and Interdomain Functions
 ************************************************************************/
@@ -226,6 +229,7 @@ static malpage_share_info_t* malpage_register(void);
 static void malpage_deregister(malpage_share_info_t *info);
 static process_report_t* malpage_generate_report(struct task_struct *task);
 static int malpage_report(pid_t procID, malpage_share_info_t *info);
+static int malpage_watch(pid_t procID, malpage_share_info_t *info);
 static unsigned long malpage_setup_ring(malpage_share_info_t *info);
 static void malpage_free_ring(malpage_share_info_t *info);
 static int malpage_grant_ring(unsigned long mfn, malpage_share_info_t *info);
