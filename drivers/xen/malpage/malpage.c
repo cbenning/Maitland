@@ -141,12 +141,16 @@ static int malpage_init(void) {
 	
 	//DANGEROUS, set the kernel mmu update intercept pointer
 	printk(KERN_ALERT ">malpage_init: setting mmu_update ptr.\n");
+	//set_kmalpage_mmu_update(&malpage_mmu_update);
+	
 	kmalpage_mmu_update = &malpage_mmu_update;
 	if(kmalpage_mmu_update==NULL){
 		printk(KERN_ALERT ">malpage_init: failed settign mmu_update ptr.\n");	
 	}
 	
 	printk(KERN_ALERT ">malpage_init: setting multi_mmu_update ptr.\n");
+	//set_kmalpage_mmu_update(&malpage_multi_mmu_update);
+	
 	kmalpage_multi_mmu_update = &malpage_multi_mmu_update;
 	if(kmalpage_multi_mmu_update==NULL){
 		printk(KERN_ALERT ">malpage_init: failed settign multi_mmu_update ptr.\n");	
