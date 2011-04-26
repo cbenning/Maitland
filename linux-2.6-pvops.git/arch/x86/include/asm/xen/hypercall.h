@@ -227,10 +227,19 @@ HYPERVISOR_set_trap_table(struct trap_info *table)
 
 
 //TODO
-static int (*kmalpage_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid) = NULL;
-static int (*kmalpage_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid) = NULL;
-EXPORT_SYMBOL(kmalpage_mmu_update);
-EXPORT_SYMBOL(kmalpage_multi_mmu_update);
+extern int (*kmalpage_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid);
+extern int (*kmalpage_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid);
+
+//static inline void set_kmalpage_mmu_update(int (*new_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid)){
+//		kmalpage_mmu_update = new_mmu_update;
+//}
+
+//static inline void set_kmalpage_multi_mmu_update(int (*new_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid)){
+//		kmalpage_multi_mmu_update = new_multi_mmu_update;
+//}
+
+//EXPORT_SYMBOL(set_kmalpage_mmu_update);
+//EXPORT_SYMBOL(set_kmalpage_multi_mmu_update);
 
 static inline int
 HYPERVISOR_mmu_update(struct mmu_update *req, int count,
