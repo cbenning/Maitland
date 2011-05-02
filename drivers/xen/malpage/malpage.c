@@ -185,6 +185,12 @@ static void malpage_exit(void) {
 
 
 static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid){
+	
+	/*
+	mmu_update-> uint64_t ptr;  // Machine address of PTE.
+	mmu_update-> uint64_t val;  // New contents of PTE.
+	 */
+	
 	printk(KERN_ALERT "malpage_mmu_update:%u",domid);
 	return 0;
 }
@@ -1472,6 +1478,92 @@ static int malpage_xs_report(process_report_t *rep){
 }
 
 
+static int malpage_xs_watch(process_report_t *rep){
+
+
+	struct xenbus_transaction *xstrans;
+	char *pfn_str,*report_frame_path,*domid_str,*report_path, *pid_str;
+	int result;
+	int i;
+
+	#ifdef MALPAGE_DEBUG
+	printk(KERN_ALERT "->malpage_xs_report\n");
+	#endif
+
+	xstrans = kmalloc(sizeof(struct xenbus_transaction),0);
+	result = xenbus_transaction_start(xstrans);
+
+	//Get a string version of the domid to use in the path
+	domid_str = kzalloc(strlen("10000"),0);
+	sprintf(domid_str, "%u", rep->domid);
+
+	pid_str = kzalloc(strlen("100000"),0);
+	sprintf(pid_str, "%u", rep->process_id);
+
+
+	//Put grefs and frams nums in XS
+	//ULONG_MAX: 18446744073709551615
+
+	report_path = kzalloc(strlen(MALPAGE_XS_WATCHREPORT_PATH)+strlen(domid_str),0);
+	if((result = sprintf(report_path, "%s/%s",MALPAGE_XS_WATCHREPORT_PATH, domid_str)) < 1){
+		#ifdef MALPAGE_DEBUG
+		printk(KERN_ALERT "->malpage_xs_watch: sprintf broke: %d\n",result);
+		#endif
+		return MALPAGE_GENERALERR;
+	}
+
+	report_frame_path = kzalloc(strlen(MALPAGE_XS_WATCHREPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_FRAME_PATH),0);
+	if((result = sprintf(report_frame_path, "%s/%s/%s",MALPAGE_XS_WATCHREPORT_PATH, domid_str, MALPAGE_XS_REPORT_FRAME_PATH)) < 1){
+		#ifdef MALPAGE_DEBUG
+		printk(KERN_ALERT "->malpage_xs_watch: sprintf broke: %d\n",result);
+		#endif
+		return MALPAGE_GENERALERR;
+	}
+
+	//Make frame dir
+	result = xenbus_mkdir(*xstrans, report_path, MALPAGE_XS_REPORT_FRAME_PATH);
+
+	pfn_str = kzalloc(strlen("18446744073709551615"),0);
+
+	for(i=0; i < rep->pfn_list_length; i ++){
+
+		sprintf(pfn_str, "%lu",rep->pfn_list[i]);
+
+		//Signal report is finished
+		result = xenbus_write(*xstrans, report_frame_path, pfn_str, 0);
+
+	}
+
+
+	//Write domid
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_DOMID_PATH, domid_str);
+
+	//write pid
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_PID_PATH, pid_str);
+
+
+
+	#ifdef MALPAGE_DEBUG
+	printk(KERN_ALERT "->malpage_xs_report: Finished writing to %s/%s\n",report_path,MALPAGE_XS_REPORT_READY_PATH);
+	#endif
+
+	//Signal report is finished
+	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_READY_PATH, "1");
+
+	//Finish up
+	result = xenbus_transaction_end(*xstrans, 0);
+
+	//Clean up
+	kfree(report_path);
+	kfree(domid_str);
+	kfree(xstrans);
+
+	return 0;
+
+}
+
+
+
 static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 
 	process_report_t *rep;
@@ -1530,7 +1622,41 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 
 static int malpage_watch(pid_t procID,malpage_share_info_t *info) {
 
+	//gather report. notify monitor.
 
+	process_report_t *rep;
+	int i;
+	struct task_struct *task;
+
+
+	for_each_process(task) {
+		if ( task->pid == procID) {
+			break;
+		}
+	}
+
+	//Generate report
+	rep = malpage_generate_report(task);
+	rep->domid = info->domid;
+
+	#ifdef MALPAGE_DEBUG
+	printk(KERN_ALERT "DomU: Watch Report Generated:\n");
+	printk(KERN_ALERT "	process_id: %u\n",rep->process_id);
+	printk(KERN_ALERT "	domid: %u\n",rep->domid);
+	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
+	printk(KERN_ALERT "	pfn_list:	");
+	#endif
+
+
+	#ifdef MALPAGE_DEBUG
+	//malpage_dump_file(rep);
+	#endif
+
+	#ifdef MALPAGE_DEBUG
+	printk(KERN_ALERT "Storing watch report in XS\n");
+	#endif
+
+	malpage_xs_watch(rep);
 
 
 	return 0;

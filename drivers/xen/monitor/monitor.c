@@ -83,7 +83,7 @@ static int monitor_init(void) {
 	int result = 0;
 	struct device *err_dev;
 
-	printk(KERN_ALERT "->monitor_init: Loading...\n");
+	printk(KERN_ALERT "%s:  Loading...\n",__FUNCTION__);
 
 	//Reserve a major number
 	result = alloc_chrdev_region(&monitor_dev, MONITOR_MIN_MINORS, MONITOR_MAX_MINORS, DEVICE_NAME);
@@ -91,7 +91,7 @@ static int monitor_init(void) {
 	monitor_minor = MINOR(monitor_dev);
 	
 	if (monitor_major < 0) {
-		printk(KERN_ALERT "->monitor_init: Registering the character device failed with major number: %d, minor: %d", monitor_major,monitor_minor);
+		printk(KERN_ALERT "%s: Registering the character device failed with major number: %d, minor: %d\n",__FUNCTION__, monitor_major,monitor_minor);
 		return -ENODEV;
 	}
 
@@ -182,6 +182,14 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			monitor_report(rep);
 			return 0;
 		break;
+		case MONITOR_WATCH:
+			#ifdef MONITOR_DEBUG
+			printk(KERN_ALERT "Received report\n");
+			#endif
+			rep = monitor_populate_report(arg);
+			monitor_watch(rep);
+			return 0;
+		break;
 		case MONITOR_DEREGISTER:
 			#ifdef MONITOR_DEBUG
 			printk(KERN_ALERT "Deregistering domain.\n");
@@ -210,6 +218,9 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 Grant table and Interdomain Functions
 
 ************************************************************************/
+
+
+
 
 
 static monitor_share_info_t* monitor_populate_info(unsigned long arg){
@@ -453,7 +464,6 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
 static int monitor_report(process_report_t *rep) {
 
-	//struct vm_struct** vm_struct_list[rep->pfn_list_length];
 	int i;
 	int j;
 	struct vm_struct* tmp_vm_struct;
@@ -466,14 +476,14 @@ static int monitor_report(process_report_t *rep) {
 	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
 	printk(KERN_ALERT "	pfn_list:	");
 
+	/*
 	for(i=0; i < rep->pfn_list_length; i++){
 		printk(KERN_ALERT "%lu",rep->pfn_list[i]);
 	}
-
+*/
 	#endif
 
 	vm_struct_list = kzalloc(rep->pfn_list_length*PAGE_SIZE,0);
-	//vm_area_list = kzalloc(rep->pfn_list_length*(sizeof(unsigned int*)),0);
 	j = 0;
 	for(i = 0; i < rep->pfn_list_length; i++){
 		tmp_vm_struct = monitor_map_gref(rep->gref_list[i],rep->domid);
@@ -484,14 +494,8 @@ static int monitor_report(process_report_t *rep) {
 	}
 
 	vm_struct_list_size = j;
-	//vm_area_list_size = j;
-	//vm_struct_list_size = rep->pfn_list_length;
 
 	printk(KERN_ALERT "Successfully mapped %d pages",vm_struct_list_size);
-	/*
-	for(i = 0; i < j; i++){
-		printk(KERN_ALERT "Size: index %d, %lu",i,vm_struct_list[i]->size);
-	}*/
 
 	//Do analysis
 
@@ -504,6 +508,12 @@ static int monitor_report(process_report_t *rep) {
 	return MONITOR_RING_RESUME;
 
 
+}
+
+
+static int monitor_watch(process_report_t *rep){
+
+	return 0;
 }
 
 
@@ -549,42 +559,9 @@ static process_report_t* monitor_populate_report(unsigned long arg){
 	}
 
 	return rep;
-	/*
-	printk(KERN_EMERG "1\n");
-	v_start = alloc_vm_area(PAGE_SIZE);	 // Get a vmarea for a page. No actual mappings are created.
-	printk(KERN_EMERG "2\n");
-	if (v_start == 0) {
-		free_vm_area(v_start);
-		printk(KERN_ALERT "populate_report: could not allocate page\n");
-		return -EFAULT;
-	}
-	printk(KERN_EMERG "3\n");
-	gnttab_set_map_op(&ops, (phys_addr_t)((v_start->addr)+(PAGE_SIZE)), GNTMAP_host_map, *next_gref, (rep->domid));
-	printk(KERN_EMERG "4\n");
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops, 1)) {
-		printk(KERN_ALERT "populate_report: HYPERVISOR map grant ref failed\n");
-		return -EFAULT;
-	}
-	printk(KERN_EMERG "5\n");
-	if (ops.status) {
-		printk(KERN_ALERT "populate_report:  HYPERVISOR map grant ref failed status = %d\n", ops.status);
-		return -EFAULT;
-	}
-	
-	int firstInt = 0;
-	int lastInt = 0;
-	
-	printk(KERN_EMERG "6\n");
-	memcpy(&firstInt,v_start->addr,sizeof(int));
-	printk(KERN_EMERG "7\n");
-	memcpy(&lastInt,v_start->addr+(PAGE_SIZE-sizeof(int)),sizeof(int));
-	printk(KERN_EMERG "8\n");
-	
-	printk(KERN_EMERG "%d, %d\n",firstInt,lastInt);
-	*/
-	
 
 }
+
 
 //Borrowed this code and tweaked from the blkback driver
 /*
@@ -680,11 +657,9 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 		v_start->size = 0;
 	}
 	else{
-		printk(KERN_ALERT "monitor_map_gref: test: %d",*((int*)v_start->addr));
-		printk("\nmonitor_map_gref: shared_page = %x, handle = %x, status = %x",(unsigned int)v_start->addr, ops.handle, ops.status);
+		//printk(KERN_ALERT "monitor_map_gref: test: %d",*((int*)v_start->addr));
+		//printk("\nmonitor_map_gref: shared_page = %x, handle = %x, status = %x",(unsigned int)v_start->addr, ops.handle, ops.status);
 	}
-
-
 
 	return v_start;
 

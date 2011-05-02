@@ -63,6 +63,8 @@
 #define MALPAGE_XS_REPORT_GREF_PATH "grefs"
 #define MALPAGE_XS_REPORT_FRAME_PATH "frames"
 
+#define MALPAGE_XS_WATCHREPORT_PATH "/malpage/watch"
+
 //IOCTL commands
 #define MALPAGE_IOC_MAGIC 250 //Magic number
 #define MALPAGE_REPORT MALPAGE_IOC_MAGIC+1
@@ -150,12 +152,18 @@ struct request_t {
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
+	domid_t domid;
+	uint64_t mmu_ptr;
+	uint64_t mmu_val;	
 };
 struct response_t {
 	unsigned int operation;
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
+	domid_t domid;
+	uint64_t mmu_ptr;
+	uint64_t mmu_val;
 };
  
 // The following defines the types to be used in the shared ring
@@ -187,12 +195,7 @@ process_report_node_t *report_list;
 /************************************************************************
 Grant table and Interdomain Variables
 ************************************************************************/
-//static struct proc_dir_entry *proc_dir = NULL;
-//static struct proc_dir_entry *proc_file = NULL;
-//static char* uuid = NULL;
-//static unsigned long malpage_shared_mfn;
 static	malpage_share_info_t *malpage_share_info;
- 
 
 /************************************************************************
 Interface and Util Functions
@@ -242,13 +245,6 @@ static int malpage_free_evtchn(int port);
 static int malpage_xs_report(process_report_t *rep);
 static int malpage_dump_file(process_report_t *rep);
 
-/*
-static void malpage_cleanup_grant(malpage_share_info_t *info, unsigned long pfn);
-static void malpage_store_report(process_report_t *rep);
-static process_report_t* malpage_retrieve_report(pid_t procID);
-static void malpage_delete_report(pid_t procID);
-static void malpage_dump_pages(unsigned long* mfnlist, unsigned int len);
-*/
 
 /************************************************************************
 Kernel module bindings

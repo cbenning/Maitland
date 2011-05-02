@@ -81,11 +81,12 @@
 #include <asm/smp.h>
 #endif
 
+//MALPAGE:START
 int (*kmalpage_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid) = NULL;
 int (*kmalpage_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid) = NULL;
 EXPORT_SYMBOL(kmalpage_mmu_update);
 EXPORT_SYMBOL(kmalpage_multi_mmu_update);
-
+//MALPAGE:END
 
 static int kernel_init(void *);
 

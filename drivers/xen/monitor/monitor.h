@@ -47,6 +47,7 @@
 #define MONITOR_REPORT MONITOR_IOC_MAGIC+1
 #define MONITOR_REGISTER MONITOR_IOC_MAGIC+8
 #define MONITOR_DEREGISTER MONITOR_IOC_MAGIC+9
+#define MONITOR_WATCH MONITOR_IOC_MAGIC+10
 
 //Debug enabled
 #define MONITOR_DEBUG 1
@@ -111,17 +112,25 @@ typedef struct pfn_page_buffer_t{
 	unsigned int grefs[(PAGE_SIZE/sizeof(unsigned int))-1];
 }pfn_page_buffer_t;
 
+
+
 struct request_t {
 	unsigned int operation;
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
+	domid_t domid;
+	uint64_t mmu_ptr;
+	uint64_t mmu_val;
 };
 struct response_t {
 	unsigned int operation;
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
+	domid_t domid;
+	uint64_t mmu_ptr;
+	uint64_t mmu_val;
 };
 
 // The following defines the types to be used in the shared ring
@@ -143,54 +152,47 @@ typedef struct monitor_share_info_t {
 	//unsigned int irq;
 	struct as_back_ring bring;
 } monitor_share_info_t;
-/*
-struct grant_map {
-	struct list_head next;
-	struct gntdev_priv *priv;
-	struct vm_area_struct *vma;
-	int index;
-	int count;
-	int flags;
-	int is_mapped;
-	struct ioctl_gntdev_grant_ref *grants;
-	struct gnttab_map_grant_ref   *map_ops;
-	struct gnttab_unmap_grant_ref *unmap_ops;
-};
-*/
+
+typedef struct monitor_dom_t {
+	domid_t domid;
+	struct monitor_proc_t* list;
+	unsigned int list_size;
+} monitor_domt_t;
+
+typedef struct monitor_proc_t {
+	unsigned int procid;
+	struct monitor_pte_t* list;
+	unsigned int list_size;
+} monitor_proc_t;
+
+typedef struct monitor_pte_t {
+	uint64_t pte;
+	struct monitor_pte_t* next;
+} monitor_pte_t;
+
 /************************************************************************
 Interface and Util Variables
 ************************************************************************/
 static int monitor_major = 0;
 static int monitor_minor = 0;
-//static monitor_pfn_report *curr_monitor_pfn_report_t;
-//static unsigned long *curr_pfnlist;
 static dev_t monitor_dev;
 static struct cdev monitor_cdev;
 static struct class* monitor_class;
 struct vm_struct** vm_struct_list;
 int vm_struct_list_size;
-//void** vm_area_list;
-//int vm_area_list_size;
 
 /************************************************************************
 Grant table and Interdomain Variables
 ************************************************************************/
 static struct as_sring *sring;
 static monitor_share_info_t *monitor_share_info;
-/*
-static as_request_t request_t;
-static as_response_t response_t;
-static int gref;
-static int port;
-*/
+
 
 /************************************************************************
 Interface and Util Functions
 ************************************************************************/
 static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
 static int monitor_register(monitor_share_info_t *info);
-
-//static int monitor_map_remote_page(int gref);
 
 
 /************************************************************************
@@ -199,10 +201,9 @@ Grant table and Interdomain Functions
 static irqreturn_t monitor_irq_handle(int irq, void *dev_id);
 static void cleanup_grant(void);
 static int monitor_report(process_report_t *rep);
+static int monitor_watch(process_report_t *rep);
 static unsigned long monitor_unmap_range(unsigned long addr_start, int length, int blocksize);
-//static unsigned long monitor_map_pageblock(process_report_t *rep);
 static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid);
-//static int monitor_map(monitor_share_info_t info);
 static void monitor_dump_pages(unsigned long* mfnlist, unsigned int len);
 static process_report_t* monitor_populate_report(unsigned long arg);
 static monitor_share_info_t* monitor_populate_info(unsigned long arg);
@@ -221,5 +222,6 @@ static struct file_operations monitor_fops = {
 //    release:	NULL,
 //    mmap:	NULL,
 };
+
 
 

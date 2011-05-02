@@ -30,6 +30,8 @@ MONITOR_XS_REPORT_GREF_PATH = "/grefs"
 MONITOR_XS_REPORT_READY_PATH = "/ready"
 MONITOR_XS_REPORT_DOMID_PATH = "/domid"
 MONITOR_XS_REPORT_PID_PATH = "/pid"
+MONITOR_XS_WATCHREPORT_PATH = "/malpage/watch"
+MONITOR_XS_WATCHREPORT_FRAME_PATH = "/frames"
 MONITOR_DEVICE = "/dev/"+MONITOR_DEVICE_NAME
 MONITOR_DUMP_DIR = "/home/malware/monitor/"
 
@@ -39,6 +41,7 @@ MONITOR_IOC_MAGIC = 270
 MONITOR_REPORT = MONITOR_IOC_MAGIC+1
 MONITOR_REGISTER = MONITOR_IOC_MAGIC+8
 MONITOR_DEREGISTER = MONITOR_IOC_MAGIC+9
+MONITOR_WATCH = MONITOR_IOC_MAGIC+10
 MONITOR_MIN_DOMID = 1
 MONITOR_MAX_DOMID = 255
 
@@ -86,6 +89,8 @@ def watch_domain_register(path, xs):
     th = xs.transaction_start()    
     value = xs.read(th, path)
     xs.transaction_end(th)
+    
+    print "reg"
 
     if (len(value) > 0):
 
@@ -169,7 +174,7 @@ def watch_domain_report(path, xs):
         
         #Nuke the report 
         th = xs.transaction_start()    
-        xs.rm(th, reg_path)
+        #xs.rm(th, reg_path)
         xs.transaction_end(th)    
         
         print "Sending report to Monitor module..."       
@@ -189,27 +194,86 @@ def watch_domain_report(path, xs):
         
         print "Reported"     
         
-        print "Dumping memory"
+        '''print "Dumping memory"
         f1 = open(MONITOR_DEVICE,"rb")
-	filename = MONITOR_DUMP_DIR+""+str(pid)+"_dump.bin"
-	f2 = open(filename,"wb")
-
-	tmp = f1.read(1096)
-	index = 1096
-	while(tmp):
-		f2.write(tmp)
-		f1.seek(1096+index)
-		tmp = f1.read(1096)
-		index = index+1096
+        filename = MONITOR_DUMP_DIR+""+str(pid)+"_dump.bin"
+        f2 = open(filename,"wb")
+        tmp = f1.read(1096)
+        index = 1096
+        
+        while(tmp):
+            f2.write(tmp)
+            f1.seek(1096+index)
+            tmp = f1.read(1096)
+            index = index+1096
         
         f1.close()
         f2.close()
+        '''
         
         #remove watch
         return False
     
     return True
     
+    
+def watch_domain_watchreport(path, xs):
+    
+    #read the value, see if it's valid
+    th = xs.transaction_start()    
+    value = xs.read(th, path)
+    xs.transaction_end(th)    
+
+    if (len(value) > 0):
+        
+        reg_path=path.rsplit("/",1)[0]
+        print "WatchReport found at:"+reg_path
+        
+        th = xs.transaction_start()    
+        dirs = xs.ls(th, reg_path+MONITOR_XS_WATCHREPORT_FRAME_PATH)
+        xs.transaction_end(th)
+        
+        frames = []
+        count = 0
+        
+        th = xs.transaction_start()    
+        for dir in dirs:
+            frames.append(int(dir))
+            count += 1
+        
+        domid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_DOMID_PATH))
+        pid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_PID_PATH))
+        
+        xs.transaction_end(th)
+        
+        
+        print "Received "+str(count)+" pfns, now removing watchreport"
+        
+        
+        #Nuke the report 
+        th = xs.transaction_start()    
+        #xs.rm(th, reg_path)
+        xs.transaction_end(th)    
+        
+        print "Sending watch report to Monitor module..."       
+        
+        #print frames 
+              
+        pfnArr = array.array('L',frames)
+        
+        print "pfnsize"+str(pfnArr.itemsize)
+        
+        ops = Monitor(MONITOR_DEVICE)
+        procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],pfnArr.buffer_info()[0],count)
+        ops.doMonitorOp(MONITOR_REPORT, procStruct)
+        ops.close()
+        
+        print "Reported"     
+       
+        #remove watch
+        return False
+    
+    return True
 
 def watch_domain_up(path, xs):
 
@@ -227,11 +291,15 @@ def watch_domain_up(path, xs):
         register_path = MONITOR_XS_REGISTER_PATH + "/"+ str(value)
         
         print "Creating "+register_path
+        xs.rm(th,register_path)
         xs.mkdir(th,register_path)
         
         #setup watch on new directory
-        xswatch(register_path, watch_domain_register, xs)
+        print "Setting watch at "+register_path
+        result = xswatch(register_path, watch_domain_register, xs)
         
+        #<xen.xend.xenstore.xswatch.xswatch instance at 0x7f14e98d9518> Good
+
         #set perms of new directory: set_permissions takes a list of three tuples
         perm_tuple = { "dom":int(value), "read":True , "write":True }
         xs.set_permissions(th,register_path, [perm_tuple,perm_tuple,perm_tuple])

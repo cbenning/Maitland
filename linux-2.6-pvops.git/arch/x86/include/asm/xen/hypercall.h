@@ -227,6 +227,7 @@ HYPERVISOR_set_trap_table(struct trap_info *table)
 
 
 //TODO
+//MALPAGE:START
 extern int (*kmalpage_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid);
 extern int (*kmalpage_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid);
 
@@ -263,6 +264,7 @@ HYPERVISOR_mmu_update(struct mmu_update *req, int count,
 
 	return _hypercall4(int, mmu_update, req, count, success_count, domid);
 }
+//MALPAGE:END
 
 
 static inline int
