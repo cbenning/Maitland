@@ -67,6 +67,8 @@
 //Custom includes
 #include "monitor.h"
 
+//Dynamic Arrays
+#include <linux/flex_array.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("CHRISBENNINGER");
@@ -122,14 +124,9 @@ static int monitor_init(void) {
 		
 	printk(KERN_ALERT "->monitor_init: Loaded.\n");
 	
-	//Initialize Grant Table
-	/*
-	result = gnttab_init();
-	if(result){
-		printk(KERN_ALERT "->monitor_init:  failed initializing grant table: %d\n",result);
-		//return MALPAGE_GENERALERR;
-	}
-	 */
+
+	//monitor_dom_list = kzalloc(sizeof(struct monitor_dom_t*)*MONITOR_MAX_VMS,GFP_KERNEL);
+	monitor_dom_list = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_VMS,GFP_KERNEL);
 
 	return 0;
 }
@@ -263,6 +260,7 @@ static int monitor_register(monitor_share_info_t *info){
 	struct vm_struct *v_start;
 	struct gnttab_map_grant_ref ops;
 	struct gnttab_unmap_grant_ref unmap_ops;
+	struct flex_array *tmp_procs;
 	//struct gnttab_setup_table setup_ops;
 
 	#ifdef MONITOR_DEBUG
@@ -374,6 +372,10 @@ static int monitor_register(monitor_share_info_t *info){
 	printk(KERN_ALERT "->monitor_register: done\n");
 	#endif
 	
+	//Setup this domain with it's own list of processes
+	tmp_procs = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_PROCS,GFP_KERNEL);
+	flex_array_put(monitor_dom_list,info->domid,tmp_procs,GFP_KERNEL);
+
 	return 0;
 }
 
@@ -512,6 +514,39 @@ static int monitor_report(process_report_t *rep) {
 
 
 static int monitor_watch(process_report_t *rep){
+
+	struct flex_array *dom_cursor;
+	struct flex_array* proc_cursor;
+	int bit_on;
+	int i;
+
+
+	dom_cursor = NULL;
+	proc_cursor = NULL;
+
+	//Check if this VM has been reported
+	dom_cursor = flex_array_get(monitor_dom_list,rep->domid);
+
+	if(dom_cursor == NULL){
+		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
+		return 0;
+	}
+
+	bit_on = 1;
+
+	proc_cursor = flex_array_get(dom_cursor,rep->process_id);
+	//Need to create an empty one
+	if(proc_cursor == NULL){
+		//Setup this domain with it's own list of processes
+		proc_cursor = flex_array_alloc(sizeof(int),MONITOR_MAX_PFNS,GFP_KERNEL);
+	}
+
+
+	for(i=0; i < rep->pfn_list_length; i++){
+		flex_array_put(proc_cursor, rep->pfn_list[i], &bit_on, GFP_KERNEL); //Set all of the PFNs to On
+	}
+
+	flex_array_put(dom_cursor,rep->process_id,proc_cursor,GFP_KERNEL);
 
 	return 0;
 }
@@ -838,4 +873,5 @@ static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_
 
 module_init( monitor_init);
 module_exit( monitor_exit);
+
 

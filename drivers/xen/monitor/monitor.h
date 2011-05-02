@@ -84,6 +84,10 @@
 #define MONITOR_VMSTRUCT_SIZE PAGE_SIZE*2
 #define MONITOR_GNTTAB_SIZE 10000
 
+#define MONITOR_MAX_VMS 256
+#define MONITOR_MAX_PROCS 65536
+#define MONITOR_MAX_PFNS ULONG_MAX
+
 /************************************************************************
 Module Interface and Util Structs
 ************************************************************************/
@@ -153,22 +157,6 @@ typedef struct monitor_share_info_t {
 	struct as_back_ring bring;
 } monitor_share_info_t;
 
-typedef struct monitor_dom_t {
-	domid_t domid;
-	struct monitor_proc_t* list;
-	unsigned int list_size;
-} monitor_domt_t;
-
-typedef struct monitor_proc_t {
-	unsigned int procid;
-	struct monitor_pte_t* list;
-	unsigned int list_size;
-} monitor_proc_t;
-
-typedef struct monitor_pte_t {
-	uint64_t pte;
-	struct monitor_pte_t* next;
-} monitor_pte_t;
 
 /************************************************************************
 Interface and Util Variables
@@ -186,6 +174,7 @@ Grant table and Interdomain Variables
 ************************************************************************/
 static struct as_sring *sring;
 static monitor_share_info_t *monitor_share_info;
+static struct flex_array *monitor_dom_list;
 
 
 /************************************************************************

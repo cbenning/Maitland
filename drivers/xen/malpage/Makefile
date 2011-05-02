@@ -3,7 +3,9 @@
 #DEV_LIBS=/home/chris/workspace/dev_lib/modules/2.6.32.27/source
 #DEV_LIBS=/home/chris/workspace/dev_lib/modules/linux-2.6.32-xen
 #DEV_LIBS=/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git
+
 DEV_LIBS=/home/chris/workspace/dev_lib/modules/build-linux-2.6-pvops_x86_64
+##EXTRA_CFLAGS := -D__KERNEL__ -O2 -DMODULE
 
 obj-m := malpage.o
 
