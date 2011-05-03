@@ -258,7 +258,7 @@ HYPERVISOR_mmu_update(struct mmu_update *req, int count,
 			kmalpage_mmu_update(req,count,success_count,domid);
 		}
 		else{
-			printk(KERN_ALERT "HYPERVISOR_mmu_update, no pointer set though.");
+			//printk(KERN_ALERT "HYPERVISOR_mmu_update, no pointer set though.");
 		}
 	}
 

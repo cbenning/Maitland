@@ -84,6 +84,7 @@
 #define MALPAGE_RING_KILL 3
 #define MALPAGE_RING_RESUME 4
 #define MALPAGE_RING_HALT 5
+#define MALPAGE_RING_MMUUPDATE 6
 
 //Storage constants
 #define MALPAGE_GREF_PAGE_COUNT (PAGE_SIZE/sizeof(unsigned int))-1
@@ -156,6 +157,7 @@ struct request_t {
 	uint64_t mmu_ptr;
 	uint64_t mmu_val;	
 };
+
 struct response_t {
 	unsigned int operation;
 	unsigned int pfn_gref;
@@ -206,12 +208,9 @@ static void malpage_exit(void);
 static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
 static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
-//static ssize_t malpage_read_gref(struct file *filp, char __user *buffer, size_t count, loff_t *offp);
-//static ssize_t malpage_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp);
 static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates,  int anon);
 static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr);
 static pfn_ll_node* pfnlist(struct task_struct *task, int uniq);
-//static void pfnlist_show(pfn_ll_node *root);
 static int pfnlist_size(pfn_ll_node *root);
 static int free_pfn_ll(pfn_ll_node *root);
 static unsigned long* pfnlist_mkarray(pfn_ll_node *root, int length);

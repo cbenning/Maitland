@@ -190,37 +190,44 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 	mmu_update-> uint64_t ptr;  // Machine address of PTE.
 	mmu_update-> uint64_t val;  // New contents of PTE.
 	 */
-	printk(KERN_ALERT "malpage_mmu_update:%u",domid);
 	
-	//static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 	struct request_t *ring_req;
 	int notify;
 
+	//printk(KERN_ALERT "malpage_mmu_update:%u",domid);
+	//static int malpage_report(pid_t procID,malpage_share_info_t *info) {
+
 	// Write a request into the ring and update the req-prod pointer
 	ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
-	ring_req->operation = MALPAGE_RING_REPORT;
-
-
-
-	reqid++;
-	info->ring.req_prod_pvt += 1;
+	ring_req->operation = MALPAGE_RING_MMUUPDATE;
+	malpage_share_info->fring.req_prod_pvt += 1;
 
 	// Send a reqest to backend followed by an int if needed
-	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(info->ring), notify);
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
 
-	if (notify) {
-		printk("\nxen:DomU: Sent a req to Dom0");
-		notify_remote_via_irq(info->irq);
-	} else {
-		printk("\nxen:DomU: No notify req to Dom0");
-		notify_remote_via_irq(info->irq);
-	}
+	notify_remote_via_irq(malpage_share_info->irq);
 
 	return 0;
 }
 
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
-	printk(KERN_ALERT "malpage_multi_mmu_update:%u",domid);
+
+	struct request_t *ring_req;
+	int notify;
+
+	//printk(KERN_ALERT "malpage_multi_mmu_update:%u",domid);
+	//static int malpage_report(pid_t procID,malpage_share_info_t *info) {
+
+	// Write a request into the ring and update the req-prod pointer
+	ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
+	ring_req->operation = MALPAGE_RING_MMUUPDATE;
+	malpage_share_info->fring.req_prod_pvt += 1;
+
+	// Send a reqest to backend followed by an int if needed
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
+
+	notify_remote_via_irq(malpage_share_info->irq);
+
 	return 0;
 }
 

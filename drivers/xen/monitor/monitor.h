@@ -60,13 +60,13 @@
 #define MONITOR_ALLOCERR -15
 //#define MONITOR_DOMID_RESOLVE_FAILED -12
 
-
 //Operations for the ring communication
 #define MONITOR_RING_REPORT 1
 #define MONITOR_RING_NONOP 2
 #define MONITOR_RING_KILL 3
 #define MONITOR_RING_RESUME 4
 #define MONITOR_RING_HALT 5
+#define MONITOR_RING_MMUUPDATE 6
 
 //Storage constants
 #define MONITOR_GREF_PAGE_COUNT (PAGE_SIZE/sizeof(unsigned int))-1
@@ -182,7 +182,8 @@ Interface and Util Functions
 ************************************************************************/
 static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
 static int monitor_register(monitor_share_info_t *info);
-
+static int monitor_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
+static int monitor_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
 
 /************************************************************************
 Grant table and Interdomain Functions

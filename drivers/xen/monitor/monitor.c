@@ -68,7 +68,8 @@
 #include "monitor.h"
 
 //Dynamic Arrays
-#include <linux/flex_array.h>
+//#include <linux/flex_array.h>
+#include "flex_array.c"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("CHRISBENNINGER");
@@ -393,11 +394,10 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 		monitor_share_info_t *monitor_share_info;
 		
 		#ifdef MONITOR_DEBUG
-		printk(KERN_ALERT "Dom0: Handling Event\n");
+		//printk(KERN_ALERT "Dom0: Handling Event\n");
 		#endif
 
 		monitor_share_info = (monitor_share_info_t*)dev_id;
-
 		rc = monitor_share_info->bring.req_cons;
 		rp = monitor_share_info->bring.sring->req_prod;
 		
@@ -432,6 +432,10 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					//return IRQ_HANDLED;
 					break;
 
+				case MONITOR_RING_MMUUPDATE:
+					printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE", __FUNCTION__);
+
+					break;
 				default:
 					printk(KERN_ALERT "\nMonitor, Unrecognized operation: %u", req.operation);
 					break;
@@ -516,7 +520,7 @@ static int monitor_report(process_report_t *rep) {
 static int monitor_watch(process_report_t *rep){
 
 	struct flex_array *dom_cursor;
-	struct flex_array* proc_cursor;
+	struct flex_array *proc_cursor;
 	int bit_on;
 	int i;
 
@@ -529,7 +533,7 @@ static int monitor_watch(process_report_t *rep){
 
 	if(dom_cursor == NULL){
 		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
-		return 0;
+		return -1;
 	}
 
 	bit_on = 1;
@@ -541,13 +545,31 @@ static int monitor_watch(process_report_t *rep){
 		proc_cursor = flex_array_alloc(sizeof(int),MONITOR_MAX_PFNS,GFP_KERNEL);
 	}
 
-
+	//Memory LEAK, FIXME
 	for(i=0; i < rep->pfn_list_length; i++){
 		flex_array_put(proc_cursor, rep->pfn_list[i], &bit_on, GFP_KERNEL); //Set all of the PFNs to On
 	}
 
 	flex_array_put(dom_cursor,rep->process_id,proc_cursor,GFP_KERNEL);
 
+	return 0;
+}
+
+
+
+static int monitor_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid){
+
+	/*
+	mmu_update-> uint64_t ptr;  // Machine address of PTE.
+	mmu_update-> uint64_t val;  // New contents of PTE.
+	 */
+
+	printk(KERN_ALERT "%s:%u",__FUNCTION__,domid);
+	return 0;
+}
+
+static int monitor_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
+	printk(KERN_ALERT "%s:%u",__FUNCTION__,domid);
 	return 0;
 }
 
