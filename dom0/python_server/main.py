@@ -114,7 +114,9 @@ def watch_domain_register(path, xs):
         xswatch(watch_path, watch_domain_down, xs)
         
         #set perms of new directory: set_permissions takes a list of three tuples
-        watch_path = MONITOR_XS_REPORT_PATH+"/"+str(values[0])
+        #watch_path = MONITOR_XS_REPORT_PATH+"/"+str(values[0])
+        watch_path = MONITOR_XS_WATCHREPORT_PATH+"/"+str(values[0])
+        
 
         th = xs.transaction_start()    
         perm_tuple = { "dom":int(values[0]), "read":True , "write":True }
@@ -123,7 +125,9 @@ def watch_domain_register(path, xs):
         
         xs.transaction_end(th)
         
-        print "Watching path for report: "+watch_path
+        #print "Watching path for report: "+watch_path
+        #xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_report, xs)
+        print "Watching path for watch_report: "+watch_path
         xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_report, xs)
         
 

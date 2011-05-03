@@ -20,6 +20,7 @@ MALPAGE_PFNCOUNT = MALPAGE_IOC_MAGIC+5
 MALPAGE_PFNLISTSHOW = MALPAGE_IOC_MAGIC+6
 MALPAGE_REGISTER = MALPAGE_IOC_MAGIC+8
 MALPAGE_TEST = MALPAGE_IOC_MAGIC+9
+MALPAGE_WATCH = MALPAGE_IOC_MAGIC+10
 
 class Malpage():
 	def __init__(self,fileName):
@@ -53,7 +54,10 @@ def main():
 	elif(sys.argv[2] == "test"):
 		#Test
 		ops.doMalpageOp(MALPAGE_TEST, pid)		
-	
+		
+	elif(sys.argv[2] == "watch"):
+		#Test
+		ops.doMalpageOp(MALPAGE_WATCH, pid)		
 
 	else:
 		print "Command unknown"
