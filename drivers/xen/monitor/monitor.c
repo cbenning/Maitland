@@ -67,7 +67,10 @@
 //Custom includes
 #include "monitor.h"
 
+
 #include <linux/bootmem.h> //For max_pfn
+#include <linux/bitmap.h> //For bitmap
+#include <linux/bitops.h>
 
 //Dynamic Arrays
 //#include <linux/flex_array.h>
@@ -87,6 +90,7 @@ static int monitor_init(void) {
 
 	int result = 0;
 	struct device *err_dev;
+	//int i;
 
 	printk(KERN_ALERT "%s:  Loading...\n",__FUNCTION__);
 
@@ -128,9 +132,9 @@ static int monitor_init(void) {
 		
 	printk(KERN_ALERT "->monitor_init: Loaded.\n");
 	
-
-	//monitor_dom_list = kzalloc(sizeof(struct monitor_dom_t*)*MONITOR_MAX_VMS,GFP_KERNEL);
-	monitor_dom_list = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_VMS,GFP_KERNEL);
+	//Init the data store
+	monitor_dom_list = kzalloc(sizeof(unsigned long*)*MONITOR_MAX_VMS,GFP_KERNEL);
+	//monitor_dom_list = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_VMS,GFP_KERNEL);
 
 	return 0;
 }
@@ -264,7 +268,6 @@ static int monitor_register(monitor_share_info_t *info){
 	struct vm_struct *v_start;
 	struct gnttab_map_grant_ref ops;
 	struct gnttab_unmap_grant_ref unmap_ops;
-	struct flex_array *tmp_procs;
 	//struct gnttab_setup_table setup_ops;
 
 	#ifdef MONITOR_DEBUG
@@ -377,8 +380,10 @@ static int monitor_register(monitor_share_info_t *info){
 	#endif
 	
 	//Setup this domain with it's own list of processes
-	tmp_procs = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_PROCS,GFP_KERNEL);
-	flex_array_put(monitor_dom_list,info->domid,tmp_procs,GFP_KERNEL);
+	//tmp_procs = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_PROCS,GFP_KERNEL);
+	//flex_array_put(monitor_dom_list,info->domid,tmp_procs,GFP_KERNEL);
+	monitor_dom_list[info->domid] = kzalloc(sizeof(unsigned long*)*MONITOR_MAX_PROCS,GFP_KERNEL);
+
 
 	return 0;
 }
@@ -525,14 +530,41 @@ static int monitor_report(process_report_t *rep) {
 
 static int monitor_watch(process_report_t *rep){
 
-	struct flex_array *dom_cursor;
-	struct flex_array *proc_cursor;
-	int bit_on;
+	//struct flex_array *dom_cursor;
+	//struct flex_array *proc_cursor;
+	//int bit_on;
 	int i;
+	unsigned long **dom_cursor;
+	unsigned long *proc_cursor;
+
 
 	dom_cursor = NULL;
 	proc_cursor = NULL;
 
+
+	dom_cursor = &monitor_dom_list[rep->domid];
+	if(!dom_cursor){
+		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
+		return -1;
+	}
+
+	proc_cursor = kzalloc(MONITOR_MAX_PFNS/8,GFP_KERNEL);
+
+	if(!bitmap_empty(proc_cursor,MONITOR_MAX_PFNS)){
+		printk(KERN_ALERT "%s, Unable to allocate bitmap for process, ignoring watch.",__FUNCTION__);
+		return -1;
+	}
+
+	dom_cursor[rep->process_id] = proc_cursor;
+	
+	for(i=0; i < rep->pfn_list_length; i++){
+		//bitmap_set(proc_cursor,rep->pfn_list[i],MONITOR_MAX_PFNS); //Set all of the PFNs to On
+		set_bit(rep->pfn_list[i],proc_cursor);
+	}
+
+	monitor_dom_list[rep->domid] = proc_cursor;
+
+/*
 	printk(KERN_ALERT "1\n");
 
 	//Check if this VM has been reported
@@ -575,21 +607,41 @@ static int monitor_watch(process_report_t *rep){
 	#ifdef MONITOR_DEBUG
 	printk(KERN_ALERT "%s, Watch is now set for proc:%ul in dom:%ul",__FUNCTION__,rep->process_id,rep->domid);
 	#endif
-
+*/
 	return 0;
 }
 
 
 static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int domid){
 
-	struct flex_array *dom_cursor;
-	struct flex_array *proc_cursor;
+	//struct flex_array *dom_cursor;
+	//struct flex_array *proc_cursor;
 	int i;
-	int *bit_result;
+	//int *bit_result;
+	unsigned long **dom_cursor;
+	unsigned long *proc_cursor;
+	unsigned int pid;
+	unsigned long *dst;
 
-	dom_cursor = NULL;
-	proc_cursor = NULL;
+	dom_cursor = monitor_dom_list[domid];
+	if(!dom_cursor){
+		//printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
+		return -1;
+	}
 
+	for(i=0; i < MONITOR_MAX_PROCS; i++){
+		proc_cursor = dom_cursor[i];
+		if(proc_cursor){
+			
+			if(test_bit(mmu_mfn,proc_cursor)){
+				printk(KERN_ALERT "Process #%d is attempting to change PTE",__FUNCTION__,i);
+				break;
+			}
+		}
+	}
+
+
+/*
 	//Check if this VM has been reported
 	dom_cursor = flex_array_get(monitor_dom_list,domid);
 
@@ -609,7 +661,7 @@ static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int dom
 			}
 		}
 	}
-
+*/
 
 	return 0;
 

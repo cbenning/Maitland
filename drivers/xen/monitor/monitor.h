@@ -86,7 +86,8 @@
 
 #define MONITOR_MAX_VMS 256
 #define MONITOR_MAX_PROCS 65536
-#define MONITOR_MAX_PFNS ULONG_MAX
+#define MONITOR_MAX_PFNS max_pfn
+//#define MONITOR_MAX_PFNS ULONG_MAX
 
 
 /************************************************************************
@@ -171,7 +172,8 @@ Grant table and Interdomain Variables
 ************************************************************************/
 static struct as_sring *sring;
 static monitor_share_info_t *monitor_share_info;
-static struct flex_array *monitor_dom_list;
+//static struct flex_array *monitor_dom_list;
+static unsigned long **monitor_dom_list;
 
 
 /************************************************************************
