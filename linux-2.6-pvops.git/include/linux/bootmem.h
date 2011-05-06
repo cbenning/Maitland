@@ -18,7 +18,7 @@ extern unsigned long min_low_pfn;
  * highest page
  */
 extern unsigned long max_pfn;
-
+EXPORT_SYMBOL(max_pfn);
 #ifdef CONFIG_CRASH_DUMP
 extern unsigned long saved_max_pfn;
 #endif

@@ -61,7 +61,7 @@
  *
  * - Mark all registers as potentially clobbered
  *    Even unused parameters can be clobbered by the hypervisor, so we
- *    need to make sure gcc knows it.
+ *    nee to make sure gcc knows it.
  *
  * - Avoid compiler bugs.
  *    This is the tricky part.  Because x86_32 has such a constrained
@@ -588,7 +588,7 @@ MULTI_mmu_update(struct multicall_entry *mcl, struct mmu_update *req,
 			kmalpage_multi_mmu_update(mcl,req,count,success_count,domid);
 		}
 		else{
-			printk(KERN_ALERT "MULTI_mmu_update, no pointer set though.");
+			//printk(KERN_ALERT "MULTI_mmu_update, no pointer set though.");
 		}
 	}	
 	
