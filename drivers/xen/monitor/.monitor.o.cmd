@@ -639,6 +639,12 @@ deps_/home/chris/workspace/malware_trunk/drivers/xen/monitor/monitor.o := \
   include/config/sys/hypervisor.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/hypervisor.h \
   /home/chris/workspace/malware_trunk/drivers/xen/monitor/monitor.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/bootmem.h \
+    $(wildcard include/config/crash/dump.h) \
+    $(wildcard include/config/have/arch/bootmem/node.h) \
+    $(wildcard include/config/have/arch/alloc/remap.h) \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/dma.h \
+    $(wildcard include/config/pci.h) \
   /home/chris/workspace/malware_trunk/drivers/xen/monitor/flex_array.c \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/flex_array.h \
 

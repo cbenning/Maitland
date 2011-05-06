@@ -181,7 +181,7 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 static int monitor_register(monitor_share_info_t *info);
 static int monitor_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
 static int monitor_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
-static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, domid_t domid);
+static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int domid);
 
 /************************************************************************
 Grant table and Interdomain Functions

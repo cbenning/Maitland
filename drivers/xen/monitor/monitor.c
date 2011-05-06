@@ -67,6 +67,8 @@
 //Custom includes
 #include "monitor.h"
 
+#include <linux/bootmem.h> //For max_pfn
+
 //Dynamic Arrays
 //#include <linux/flex_array.h>
 #include "flex_array.c"
@@ -121,6 +123,7 @@ static int monitor_init(void) {
 	printk(KERN_ALERT "I was assigned major number %d\n", monitor_major);
 	printk(KERN_ALERT "PAGE_SHIFT: %d\n", PAGE_SHIFT);
 	printk(KERN_ALERT "PAGE_SIZE: %lu\n", PAGE_SIZE);
+	printk(KERN_ALERT "max_pfn: %lu\n", max_pfn);
 	#endif
 		
 	printk(KERN_ALERT "->monitor_init: Loaded.\n");
@@ -527,18 +530,21 @@ static int monitor_watch(process_report_t *rep){
 	int bit_on;
 	int i;
 
-
 	dom_cursor = NULL;
 	proc_cursor = NULL;
+
+	printk(KERN_ALERT "1\n");
 
 	//Check if this VM has been reported
 	dom_cursor = flex_array_get(monitor_dom_list,rep->domid);
 
+	printk(KERN_ALERT "2\n");
 	if(dom_cursor == NULL){
 		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
 		return -1;
 	}
 
+	printk(KERN_ALERT "3\n");
 	bit_on = 1;
 
 	#ifdef MONITOR_DEBUG
@@ -546,16 +552,23 @@ static int monitor_watch(process_report_t *rep){
 	#endif
 
 	proc_cursor = flex_array_get(dom_cursor,rep->process_id);
+
+	printk(KERN_ALERT "4\n");
+
 	//Need to create an empty one
 	if(proc_cursor == NULL){
 		//Setup this domain with it's own list of processes
 		proc_cursor = flex_array_alloc(sizeof(int),MONITOR_MAX_PFNS,GFP_KERNEL);
 	}
 
+	printk(KERN_ALERT "5\n");
+
 	//Memory LEAK, FIXME
 	for(i=0; i < rep->pfn_list_length; i++){
 		flex_array_put(proc_cursor, rep->pfn_list[i], &bit_on, GFP_KERNEL); //Set all of the PFNs to On
 	}
+
+	printk(KERN_ALERT "6\n");
 
 	flex_array_put(dom_cursor,rep->process_id,proc_cursor,GFP_KERNEL);
 
@@ -567,7 +580,7 @@ static int monitor_watch(process_report_t *rep){
 }
 
 
-static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, domid_t domid){
+static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int domid){
 
 	struct flex_array *dom_cursor;
 	struct flex_array *proc_cursor;

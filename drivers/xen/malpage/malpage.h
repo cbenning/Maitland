@@ -196,8 +196,9 @@ process_report_node_t *report_list;
 /************************************************************************
 Grant table and Interdomain Variables
 ************************************************************************/
-static	malpage_share_info_t *malpage_share_info;
-static int malpage_share_info_set = 0;
+static	malpage_share_info_t *malpage_share_info = NULL;
+//static int malpage_share_info_set = 0;
+static spinlock_t malpage_mmu_info_lock;
 
 /************************************************************************
 Interface and Util Functions

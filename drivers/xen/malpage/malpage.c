@@ -73,6 +73,9 @@
 #include <linux/fcntl.h>
 #include <linux/file.h>
 
+//For locks
+#include <linux/spinlock.h>
+
 //Custom Includes
 #include "malpage.h"
 
@@ -154,6 +157,7 @@ static int malpage_init(void) {
 		printk(KERN_ALERT ">malpage_init: failed settign multi_mmu_update ptr.\n");	
 	}
 	
+	malpage_mmu_info_lock = SPIN_LOCK_UNLOCKED; //Initialize the lock
 	//malpage_share_info_set=1;
 	return 0;
 }
@@ -189,18 +193,17 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 	mmu_update-> uint64_t ptr;  // Machine address of PTE.
 	mmu_update-> uint64_t val;  // New contents of PTE.
 	 */
-	
+
 	pteval_t tmp_ptev;
 	struct request_t *ring_req;
 	int notify;
 
+	if(count<1 && malpage_share_info){
+		return 0;
+	}
 	//printk(KERN_ALERT "malpage_mmu_update:%u",domid);
-	//static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 
-	//	if(!malpage_share_info_set){
-	//		return -1;
-	//	}
-
+	spin_lock(&malpage_mmu_info_lock);
 	// Write a request into the ring and update the req-prod pointer
 	ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
 	ring_req->operation = MALPAGE_RING_MMUUPDATE;
@@ -212,14 +215,14 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 	//ring_req->mmu_mfn = pte_mfn(tmp_pte); //Fails horribly
 
 	ring_req->mmu_val = req->val;
-
-
 	
 	//	printk(KERN_ALERT "MALPAGE: %u", domid);
 	// Send a reqest to backend followed by an int if needed
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
 
 	notify_remote_via_irq(malpage_share_info->irq);
+	
+	spin_unlock(&malpage_mmu_info_lock);
 
 	return 0;
 }
@@ -231,41 +234,37 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 	int notify;
 	int i;
 
-	//if(!malpage_share_info_set){
-	//	return -1;
-	//}
-	printk(KERN_ALERT "MULTI:%d",count);
+	if(count<1 && malpage_share_info){
+		return 0;
+	}
 
+	//	printk(KERN_ALERT "MULTI:%d",count);
 
+	spin_lock(&malpage_mmu_info_lock);
 	for(i=0; i < count; i++){
 		// Write a request into the ring and update the req-prod pointer
 		ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
 		ring_req->operation = MALPAGE_RING_MMUUPDATE;
+	
 		malpage_share_info->fring.req_prod_pvt += 1;
-
-		printk(KERN_ALERT "1");
 
 		tmp_ptev = req[i].ptr;
 		ring_req->mmu_mfn = ((tmp_ptev & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
 		//pte.pte & PTE_PFN_MASK) >> PAGE_SHIFT //A section of pte_mfn().
 		//ring_req->mmu_mfn = pte_mfn(tmp_pte); //Fails horribly
 
-		printk(KERN_ALERT "2");
-
 		ring_req->mmu_val = req[i].val;
 		ring_req->domid = malpage_share_info->domid;
 
-		printk(KERN_ALERT "3");
-
 		// Send a reqest to backend followed by an int if needed
 		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
-
-		printk(KERN_ALERT "4");
-
 		//notify_remote_via_irq(malpage_share_info->irq);
 	}
-	notify_remote_via_irq(malpage_share_info->irq);
-	
+	if(count>0){
+		notify_remote_via_irq(malpage_share_info->irq);
+	}	
+
+	spin_unlock(&malpage_mmu_info_lock);
 
 
 	return 0;
