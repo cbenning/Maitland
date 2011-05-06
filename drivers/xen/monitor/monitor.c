@@ -392,7 +392,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 		struct response_t resp;
 		int notify;
 		monitor_share_info_t *monitor_share_info;
-		
+
 		#ifdef MONITOR_DEBUG
 		//printk(KERN_ALERT "Dom0: Handling Event\n");
 		#endif
@@ -413,7 +413,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 			//Get a copy of the request
 			memcpy(&req, RING_GET_REQUEST(&monitor_share_info->bring, rc), sizeof(req));
 
-			printk(KERN_ALERT "Report summary: procid: %u, domid: %u, age: %u, numpfns: %u\n",req.report.process_id, req.report.domid, req.report.process_age, req.report.pfn_list_length);
+			//printk(KERN_ALERT "Report summary: procid: %u, domid: %u, age: %u, numpfns: %u\n",req.report.process_id, req.report.domid, req.report.process_age, req.report.pfn_list_length);
 
 			// update the req-consumer
 			monitor_share_info->bring.req_cons = ++rc;
@@ -433,8 +433,11 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					break;
 
 				case MONITOR_RING_MMUUPDATE:
-					printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE", __FUNCTION__);
-
+					
+					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
+						printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d", __FUNCTION__,req.mmu_mfn,req.mmu_val,req.domid);
+						monitor_check_mfnval(req.mmu_mfn,req.mmu_val,req.domid);
+					}
 					break;
 				default:
 					printk(KERN_ALERT "\nMonitor, Unrecognized operation: %u", req.operation);
@@ -538,6 +541,10 @@ static int monitor_watch(process_report_t *rep){
 
 	bit_on = 1;
 
+	#ifdef MONITOR_DEBUG
+	printk(KERN_ALERT "%s, Looking for proc:%ul in dom:%ul",__FUNCTION__,rep->process_id,rep->domid);
+	#endif
+
 	proc_cursor = flex_array_get(dom_cursor,rep->process_id);
 	//Need to create an empty one
 	if(proc_cursor == NULL){
@@ -552,9 +559,48 @@ static int monitor_watch(process_report_t *rep){
 
 	flex_array_put(dom_cursor,rep->process_id,proc_cursor,GFP_KERNEL);
 
+	#ifdef MONITOR_DEBUG
+	printk(KERN_ALERT "%s, Watch is now set for proc:%ul in dom:%ul",__FUNCTION__,rep->process_id,rep->domid);
+	#endif
+
 	return 0;
 }
 
+
+static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, domid_t domid){
+
+	struct flex_array *dom_cursor;
+	struct flex_array *proc_cursor;
+	int i;
+	int *bit_result;
+
+	dom_cursor = NULL;
+	proc_cursor = NULL;
+
+	//Check if this VM has been reported
+	dom_cursor = flex_array_get(monitor_dom_list,domid);
+
+	if(dom_cursor == NULL){
+		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,domid);
+		return -1;
+	}
+
+	for(i=0; i < MONITOR_MAX_PROCS; i++){
+		proc_cursor = flex_array_get(dom_cursor,i);
+
+		//Searching through registered process' pages
+		if(proc_cursor){
+			bit_result = flex_array_get(proc_cursor,mmu_mfn);
+			if(*bit_result==1){
+				printk(KERN_ALERT "Process #%d is attempting to change PTE",__FUNCTION__,i);
+			}
+		}
+	}
+
+
+	return 0;
+
+}
 
 
 static int monitor_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid){

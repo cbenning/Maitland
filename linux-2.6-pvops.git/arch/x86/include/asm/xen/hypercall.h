@@ -580,11 +580,6 @@ static inline void
 MULTI_mmu_update(struct multicall_entry *mcl, struct mmu_update *req,
 		 int count, int *success_count, domid_t domid)
 {
-	mcl->op = __HYPERVISOR_mmu_update;
-	mcl->args[0] = (unsigned long)req;
-	mcl->args[1] = count;
-	mcl->args[2] = (unsigned long)success_count;
-	mcl->args[3] = domid;
 
 	if(domid != 0){
 		
@@ -595,7 +590,13 @@ MULTI_mmu_update(struct multicall_entry *mcl, struct mmu_update *req,
 		else{
 			printk(KERN_ALERT "MULTI_mmu_update, no pointer set though.");
 		}
-	}
+	}	
+	
+	mcl->op = __HYPERVISOR_mmu_update;
+	mcl->args[0] = (unsigned long)req;
+	mcl->args[1] = count;
+	mcl->args[2] = (unsigned long)success_count;
+	mcl->args[3] = domid;
 }
 
 static inline void

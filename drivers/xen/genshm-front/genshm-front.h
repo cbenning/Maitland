@@ -138,7 +138,9 @@ struct genshmf_info{
 	spinlock_t io_lock;
 };
 
+
 struct genshmf_info *genshm_front_info;
+
 
 typedef struct gref_list_t{
 	unsigned int gref_list[GENSHMF_GREF_PAGE_COUNT]; //Fill up te page, leave room for last gref;

@@ -1,7 +1,7 @@
-cmd_/home/chris/workspace/malware/drivers/xen/malpage/malpage.o := gcc -Wp,-MD,/home/chris/workspace/malware/drivers/xen/malpage/.malpage.o.d  -nostdinc -isystem /usr/lib/gcc/x86_64-linux-gnu/4.4.1/include -Iinclude -Iinclude2 -I/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include -I/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include -include include/linux/autoconf.h   -I/home/chris/workspace/malware/drivers/xen/malpage -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -m64 -mtune=generic -mno-red-zone -mcmodel=kernel -funit-at-a-time -maccumulate-outgoing-args -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -Wframe-larger-than=2048 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fno-dwarf2-cfi-asm -fconserve-stack  -DMODULE -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(malpage)"  -D"KBUILD_MODNAME=KBUILD_STR(malpage)"  -c -o /home/chris/workspace/malware/drivers/xen/malpage/malpage.o /home/chris/workspace/malware/drivers/xen/malpage/malpage.c
+cmd_/home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.o := gcc -Wp,-MD,/home/chris/workspace/malware_trunk/drivers/xen/malpage/.malpage.o.d  -nostdinc -isystem /usr/lib/gcc/x86_64-linux-gnu/4.4.1/include -Iinclude -Iinclude2 -I/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include -I/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include -include include/linux/autoconf.h   -I/home/chris/workspace/malware_trunk/drivers/xen/malpage -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -m64 -mtune=generic -mno-red-zone -mcmodel=kernel -funit-at-a-time -maccumulate-outgoing-args -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -Wframe-larger-than=2048 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fno-dwarf2-cfi-asm -fconserve-stack  -DMODULE -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(malpage)"  -D"KBUILD_MODNAME=KBUILD_STR(malpage)"  -c -o /home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.o /home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.c
 
-deps_/home/chris/workspace/malware/drivers/xen/malpage/malpage.o := \
-  /home/chris/workspace/malware/drivers/xen/malpage/malpage.c \
+deps_/home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.o := \
+  /home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.c \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/module.h \
     $(wildcard include/config/modules.h) \
     $(wildcard include/config/modversions.h) \
@@ -566,6 +566,23 @@ deps_/home/chris/workspace/malware/drivers/xen/malpage/malpage.o := \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/aio.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/aio_abi.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/uio.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/rmap.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/memcontrol.h \
+    $(wildcard include/config/cgroup/mem/res/ctlr/swap.h) \
+    $(wildcard include/config/cgroup/mem/cont.h) \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/cgroup.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/cgroupstats.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/taskstats.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/prio_heap.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/idr.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/cgroup_subsys.h \
+    $(wildcard include/config/cgroup/debug.h) \
+    $(wildcard include/config/cgroup/ns.h) \
+    $(wildcard include/config/cgroup/sched.h) \
+    $(wildcard include/config/cgroup/cpuacct.h) \
+    $(wildcard include/config/cgroup/device.h) \
+    $(wildcard include/config/cgroup/freezer.h) \
+    $(wildcard include/config/net/cls/cgroup.h) \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/proc_fs.h \
     $(wildcard include/config/proc/devicetree.h) \
     $(wildcard include/config/proc/kcore.h) \
@@ -657,8 +674,9 @@ deps_/home/chris/workspace/malware/drivers/xen/malpage/malpage.o := \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/xen/interface/xen-mca.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/xen/events.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/xen/evtchn.h \
-  /home/chris/workspace/malware/drivers/xen/malpage/malpage.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/file.h \
+  /home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.h \
 
-/home/chris/workspace/malware/drivers/xen/malpage/malpage.o: $(deps_/home/chris/workspace/malware/drivers/xen/malpage/malpage.o)
+/home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.o: $(deps_/home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.o)
 
-$(deps_/home/chris/workspace/malware/drivers/xen/malpage/malpage.o):
+$(deps_/home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.o):

@@ -153,9 +153,9 @@ struct request_t {
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
-	domid_t domid;
-	uint64_t mmu_ptr;
-	uint64_t mmu_val;	
+	int domid;
+	unsigned long mmu_mfn;
+	uint64_t mmu_val;
 };
 
 struct response_t {
@@ -163,14 +163,13 @@ struct response_t {
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
-	domid_t domid;
+	int domid;
 	uint64_t mmu_ptr;
 	uint64_t mmu_val;
 };
  
 // The following defines the types to be used in the shared ring
 DEFINE_RING_TYPES(as, struct request_t, struct response_t);
-
 
 //struct for passing between domains via the network
 typedef struct malpage_share_info_t {
@@ -198,6 +197,7 @@ process_report_node_t *report_list;
 Grant table and Interdomain Variables
 ************************************************************************/
 static	malpage_share_info_t *malpage_share_info;
+static int malpage_share_info_set = 0;
 
 /************************************************************************
 Interface and Util Functions

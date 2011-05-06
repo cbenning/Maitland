@@ -90,8 +90,6 @@ def watch_domain_register(path, xs):
     value = xs.read(th, path)
     xs.transaction_end(th)
     
-    print "reg"
-
     if (len(value) > 0):
 
         #delete the node

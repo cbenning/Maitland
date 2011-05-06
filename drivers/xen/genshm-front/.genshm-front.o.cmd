@@ -1,7 +1,7 @@
-cmd_/home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.o := gcc -Wp,-MD,/home/chris/workspace/malware/drivers/xen/genshm-front/.genshm-front.o.d  -nostdinc -isystem /usr/lib/gcc/x86_64-linux-gnu/4.4.1/include -Iinclude -Iinclude2 -I/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include -I/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include -include include/linux/autoconf.h   -I/home/chris/workspace/malware/drivers/xen/genshm-front -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -m64 -mtune=generic -mno-red-zone -mcmodel=kernel -funit-at-a-time -maccumulate-outgoing-args -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -Wframe-larger-than=2048 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fno-dwarf2-cfi-asm -fconserve-stack  -DMODULE -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(genshm_front)"  -D"KBUILD_MODNAME=KBUILD_STR(genshm_front)"  -c -o /home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.o /home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.c
+cmd_/home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.o := gcc -Wp,-MD,/home/chris/workspace/malware_trunk/drivers/xen/genshm-front/.genshm-front.o.d  -nostdinc -isystem /usr/lib/gcc/x86_64-linux-gnu/4.4.1/include -Iinclude -Iinclude2 -I/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include -I/home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include -include include/linux/autoconf.h   -I/home/chris/workspace/malware_trunk/drivers/xen/genshm-front -D__KERNEL__ -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -Wno-format-security -fno-delete-null-pointer-checks -Os -m64 -mtune=generic -mno-red-zone -mcmodel=kernel -funit-at-a-time -maccumulate-outgoing-args -DCONFIG_AS_CFI=1 -DCONFIG_AS_CFI_SIGNAL_FRAME=1 -pipe -Wno-sign-compare -fno-asynchronous-unwind-tables -mno-sse -mno-mmx -mno-sse2 -mno-3dnow -Wframe-larger-than=2048 -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow -fno-dwarf2-cfi-asm -fconserve-stack  -DMODULE -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(genshm_front)"  -D"KBUILD_MODNAME=KBUILD_STR(genshm_front)"  -c -o /home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.o /home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.c
 
-deps_/home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.o := \
-  /home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.c \
+deps_/home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.o := \
+  /home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.c \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/module.h \
     $(wildcard include/config/modules.h) \
     $(wildcard include/config/modversions.h) \
@@ -656,8 +656,14 @@ deps_/home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.o := \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/xen/interface/physdev.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/xen/interface/xen-mca.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/xen/events.h \
-  /home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/major.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/xen/platform_pci.h \
+    $(wildcard include/config/xen/netdev/frontend.h) \
+    $(wildcard include/config/xen/platform/pci.h) \
+    $(wildcard include/config/xen/blkdev/frontend.h) \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/xen/interface/io/protocols.h \
+  /home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.h \
 
-/home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.o: $(deps_/home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.o)
+/home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.o: $(deps_/home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.o)
 
-$(deps_/home/chris/workspace/malware/drivers/xen/genshm-front/genshm-front.o):
+$(deps_/home/chris/workspace/malware_trunk/drivers/xen/genshm-front/genshm-front.o):

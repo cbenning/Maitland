@@ -88,6 +88,7 @@
 #define MONITOR_MAX_PROCS 65536
 #define MONITOR_MAX_PFNS ULONG_MAX
 
+
 /************************************************************************
 Module Interface and Util Structs
 ************************************************************************/
@@ -100,7 +101,6 @@ typedef struct process_report_t{
 	unsigned int *gref_list;
 	unsigned int pfn_list_length;
 }process_report_t;
-
 
 typedef struct gref_list_t{
 	unsigned int gref_list[MONITOR_GREF_PAGE_COUNT]; //Fill up te page, leave room for last gref;
@@ -116,23 +116,22 @@ typedef struct pfn_page_buffer_t{
 	unsigned int grefs[(PAGE_SIZE/sizeof(unsigned int))-1];
 }pfn_page_buffer_t;
 
-
-
 struct request_t {
 	unsigned int operation;
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
-	domid_t domid;
-	uint64_t mmu_ptr;
+	int domid;
+	unsigned long mmu_mfn;
 	uint64_t mmu_val;
 };
+
 struct response_t {
 	unsigned int operation;
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
-	domid_t domid;
+	int domid;
 	uint64_t mmu_ptr;
 	uint64_t mmu_val;
 };
@@ -140,14 +139,12 @@ struct response_t {
 // The following defines the types to be used in the shared ring
 DEFINE_RING_TYPES(as, struct request_t, struct response_t);
 
-
 typedef struct monitor_uspace_info_t {
 	unsigned int domid;	
 	unsigned int gref;
 	unsigned int evtchn;
 	unsigned char uuid[MONITOR_UUID_LENGTH];
 } monitor_uspace_info_t;
-
 
 typedef struct monitor_share_info_t {
 	domid_t domid;
@@ -184,6 +181,7 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 static int monitor_register(monitor_share_info_t *info);
 static int monitor_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
 static int monitor_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
+static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, domid_t domid);
 
 /************************************************************************
 Grant table and Interdomain Functions

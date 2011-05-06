@@ -141,7 +141,6 @@ static int malpage_init(void) {
 	
 	//DANGEROUS, set the kernel mmu update intercept pointer
 	printk(KERN_ALERT ">malpage_init: setting mmu_update ptr.\n");
-	//set_kmalpage_mmu_update(&malpage_mmu_update);
 	
 	kmalpage_mmu_update = &malpage_mmu_update;
 	if(kmalpage_mmu_update==NULL){
@@ -149,13 +148,13 @@ static int malpage_init(void) {
 	}
 	
 	printk(KERN_ALERT ">malpage_init: setting multi_mmu_update ptr.\n");
-	//set_kmalpage_mmu_update(&malpage_multi_mmu_update);
 	
 	kmalpage_multi_mmu_update = &malpage_multi_mmu_update;
 	if(kmalpage_multi_mmu_update==NULL){
 		printk(KERN_ALERT ">malpage_init: failed settign multi_mmu_update ptr.\n");	
 	}
 	
+	//malpage_share_info_set=1;
 	return 0;
 }
 
@@ -191,17 +190,32 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 	mmu_update-> uint64_t val;  // New contents of PTE.
 	 */
 	
+	pteval_t tmp_ptev;
 	struct request_t *ring_req;
 	int notify;
 
 	//printk(KERN_ALERT "malpage_mmu_update:%u",domid);
 	//static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 
+	//	if(!malpage_share_info_set){
+	//		return -1;
+	//	}
+
 	// Write a request into the ring and update the req-prod pointer
 	ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
 	ring_req->operation = MALPAGE_RING_MMUUPDATE;
 	malpage_share_info->fring.req_prod_pvt += 1;
 
+	tmp_ptev = req->ptr;
+	ring_req->mmu_mfn = ((tmp_ptev & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
+	//pte.pte & PTE_PFN_MASK) >> PAGE_SHIFT //A section of pte_mfn().
+	//ring_req->mmu_mfn = pte_mfn(tmp_pte); //Fails horribly
+
+	ring_req->mmu_val = req->val;
+
+
+	
+	//	printk(KERN_ALERT "MALPAGE: %u", domid);
 	// Send a reqest to backend followed by an int if needed
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
 
@@ -212,21 +226,47 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
 
+	pteval_t tmp_ptev;
 	struct request_t *ring_req;
 	int notify;
+	int i;
 
-	//printk(KERN_ALERT "malpage_multi_mmu_update:%u",domid);
-	//static int malpage_report(pid_t procID,malpage_share_info_t *info) {
+	//if(!malpage_share_info_set){
+	//	return -1;
+	//}
+	printk(KERN_ALERT "MULTI:%d",count);
 
-	// Write a request into the ring and update the req-prod pointer
-	ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
-	ring_req->operation = MALPAGE_RING_MMUUPDATE;
-	malpage_share_info->fring.req_prod_pvt += 1;
 
-	// Send a reqest to backend followed by an int if needed
-	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
+	for(i=0; i < count; i++){
+		// Write a request into the ring and update the req-prod pointer
+		ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
+		ring_req->operation = MALPAGE_RING_MMUUPDATE;
+		malpage_share_info->fring.req_prod_pvt += 1;
 
+		printk(KERN_ALERT "1");
+
+		tmp_ptev = req[i].ptr;
+		ring_req->mmu_mfn = ((tmp_ptev & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
+		//pte.pte & PTE_PFN_MASK) >> PAGE_SHIFT //A section of pte_mfn().
+		//ring_req->mmu_mfn = pte_mfn(tmp_pte); //Fails horribly
+
+		printk(KERN_ALERT "2");
+
+		ring_req->mmu_val = req[i].val;
+		ring_req->domid = malpage_share_info->domid;
+
+		printk(KERN_ALERT "3");
+
+		// Send a reqest to backend followed by an int if needed
+		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
+
+		printk(KERN_ALERT "4");
+
+		//notify_remote_via_irq(malpage_share_info->irq);
+	}
 	notify_remote_via_irq(malpage_share_info->irq);
+	
+
 
 	return 0;
 }
@@ -497,8 +537,8 @@ static int pfnlist_mkunique(pfn_ll_node *root){
 	pfn_ll_node *front;
 	pfn_ll_node *tmp;
 	pfn_ll_node *needle_node;
-	front = root;
 	int removed;
+	front = root;
 	
 	removed = 0;
 
@@ -565,9 +605,9 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	unsigned long current_anon_vma_vm_start;
 	unsigned long current_anon_vma_vm_end;
 	long current_anon_vma_vm_length;
-	long heap_length;
-	long code_length;
-	long data_length;
+	//long heap_length;
+	//long code_length;
+	//long data_length;
 
 	unsigned long new_mfn;
 	struct mm_struct *tsk_mm;
@@ -1535,7 +1575,6 @@ static int malpage_xs_watch(process_report_t *rep){
 	pid_str = kzalloc(strlen("100000"),0);
 	sprintf(pid_str, "%u", rep->process_id);
 
-
 	//Put grefs and frams nums in XS
 	//ULONG_MAX: 18446744073709551615
 
@@ -1557,26 +1596,21 @@ static int malpage_xs_watch(process_report_t *rep){
 
 	//Make frame dir
 	result = xenbus_mkdir(*xstrans, report_path, MALPAGE_XS_REPORT_FRAME_PATH);
-
 	pfn_str = kzalloc(strlen("18446744073709551615"),0);
 
 	for(i=0; i < rep->pfn_list_length; i ++){
 
 		sprintf(pfn_str, "%lu",rep->pfn_list[i]);
-
 		//Signal report is finished
-		result = xenbus_write(*xstrans, report_frame_path, pfn_str, 0);
+		result = xenbus_write(*xstrans, report_frame_path, pfn_str, pfn_str);
 
 	}
-
 
 	//Write domid
 	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_DOMID_PATH, domid_str);
 
 	//write pid
 	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_PID_PATH, pid_str);
-
-
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "->malpage_xs_report: Finished writing to %s/%s\n",report_path,MALPAGE_XS_REPORT_READY_PATH);
@@ -1835,7 +1869,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 			switch(resp->operation) {
 
 				case MALPAGE_RING_NONOP:
-					printk(KERN_ALERT  "\nMalpage, Got NONOP: %d\n", resp->operation);
+					//printk(KERN_ALERT  "\nMalpage, Got NONOP: %d\n", resp->operation);
 					break;
 
 				case MALPAGE_RING_KILL:
