@@ -618,23 +618,23 @@ static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int dom
 	//struct flex_array *proc_cursor;
 	int i;
 	//int *bit_result;
-	unsigned long **dom_cursor;
+	unsigned long *dom_cursor;
 	unsigned long *proc_cursor;
-	unsigned int pid;
-	unsigned long *dst;
+	//unsigned int pid;
+	//unsigned long *dst;
 
-	dom_cursor = monitor_dom_list[domid];
+	dom_cursor = *(monitor_dom_list+(sizeof(unsigned long*)*domid));
 	if(!dom_cursor){
 		//printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
 		return -1;
 	}
 
 	for(i=0; i < MONITOR_MAX_PROCS; i++){
-		proc_cursor = dom_cursor[i];
+		proc_cursor = dom_cursor+(sizeof(unsigned long*)*i);
 		if(proc_cursor){
 			
 			if(test_bit(mmu_mfn,proc_cursor)){
-				printk(KERN_ALERT "Process #%d is attempting to change PTE",__FUNCTION__,i);
+				printk(KERN_ALERT "%s,Process #%d is attempting to change PTE",__FUNCTION__,i);
 				break;
 			}
 		}
@@ -667,28 +667,6 @@ static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int dom
 
 }
 
-
-static int monitor_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid){
-
-	/*
-	mmu_update-> uint64_t ptr;  // Machine address of PTE.
-	mmu_update-> uint64_t val;  // New contents of PTE.
-	 */
-
-	printk(KERN_ALERT "%s:%u",__FUNCTION__,domid);
-	return 0;
-}
-
-static int monitor_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
-	printk(KERN_ALERT "%s:%u",__FUNCTION__,domid);
-	return 0;
-}
-
-
-static unsigned long monitor_unmap_range(unsigned long addr_start, int length, int blocksize){
-
-
-}
 
 
 static process_report_t* monitor_populate_report(unsigned long arg){
@@ -900,7 +878,7 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 /*      return 0;*/
 /*}*/
 /* */
-static void cleanup_grant(void) {
+//static void cleanup_grant(void) {
       //int ret;
  /*
       printk("\nxen: dom0: cleanup_module");
@@ -915,7 +893,7 @@ static void cleanup_grant(void) {
             printk(" cleanup_module: unmapped shared frame failed");
       }
       */
-}
+//}
 
 /*
 static void monitor_dump_pages(unsigned long *addr, unsigned int numpages){
