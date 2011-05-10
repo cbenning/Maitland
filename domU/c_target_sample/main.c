@@ -39,7 +39,7 @@ int main( int argc, const char* argv[] ){
 	pg_aligned = (void*)empty_var;
 	pg_aligned = pg_aligned - ((unsigned long)pg_aligned % PAGESIZE);
 
-	tmp = mprotect(pg_aligned, PAGESIZE, PROT_EXEC); 
+	tmp = mprotect(pg_aligned, PAGESIZE*10, PROT_EXEC); 
 	if (tmp==0) {
 	    /* current code page is now writable and code from it is allowed for execution */
 		printf("Success\n");

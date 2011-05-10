@@ -187,9 +187,16 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			monitor_report(rep);
 			return 0;
 		break;
+		case MONITOR_DUMP:
+			#ifdef MONITOR_DEBUG
+			printk(KERN_ALERT "Received Dump\n");
+			#endif
+			monitor_print_watched();
+			return 0;
+		break;
 		case MONITOR_WATCH:
 			#ifdef MONITOR_DEBUG
-			printk(KERN_ALERT "Received report\n");
+			printk(KERN_ALERT "Received watch report\n");
 			#endif
 			rep = monitor_populate_report(arg);
 			monitor_watch(rep);
@@ -201,7 +208,6 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#endif
 			//monitor_register((( monitor_uspace_info_t*)arg));
 			return 0;
-			
 		break;
 		default:
 			#ifdef MONITOR_DEBUG
@@ -541,8 +547,10 @@ static int monitor_watch(process_report_t *rep){
 	dom_cursor = NULL;
 	proc_cursor = NULL;
 
+	printk(KERN_ALERT "%s, setting watch for proc %d in Dom %d.",__FUNCTION__,rep->process_id,rep->domid);
 
-	dom_cursor = &monitor_dom_list[rep->domid];
+//	dom_cursor = (monitor_dom_list+(sizeof(unsigned long*)*rep->domid));
+	dom_cursor = monitor_dom_list[rep->domid];
 	if(!dom_cursor){
 		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
 		return -1;
@@ -555,14 +563,16 @@ static int monitor_watch(process_report_t *rep){
 		return -1;
 	}
 
-	dom_cursor[rep->process_id] = proc_cursor;
-	
 	for(i=0; i < rep->pfn_list_length; i++){
 		//bitmap_set(proc_cursor,rep->pfn_list[i],MONITOR_MAX_PFNS); //Set all of the PFNs to On
+
+		//printk(KERN_ALERT "%s, setting bit %d.",__FUNCTION__,rep->pfn_list[i]);
 		set_bit(rep->pfn_list[i],proc_cursor);
 	}
 
-	monitor_dom_list[rep->domid] = proc_cursor;
+
+	dom_cursor[rep->process_id] = proc_cursor;
+	monitor_dom_list[rep->domid] = dom_cursor;
 
 /*
 	printk(KERN_ALERT "1\n");
@@ -611,6 +621,41 @@ static int monitor_watch(process_report_t *rep){
 	return 0;
 }
 
+static void monitor_print_watched(void){
+
+	int i,j,k;
+	unsigned long **dom_cursor;
+	unsigned long *proc_cursor;
+
+	printk(KERN_ALERT "%s,Dumping store...",__FUNCTION__);
+
+	for(i=0; i<MONITOR_MAX_VMS;i++){
+		dom_cursor = monitor_dom_list[i];
+
+		if(!dom_cursor){
+			continue;
+		}
+		
+		printk(KERN_ALERT "--Domain #%d",i);
+
+		for(j=0; j<MONITOR_MAX_PROCS; j++){
+			proc_cursor = dom_cursor[j];
+			if(proc_cursor){
+
+				
+				printk(KERN_ALERT "------Process #%d",j);
+			
+				for(k=0;k<MONITOR_MAX_PFNS;k++){
+
+					if(test_bit(k,proc_cursor)){
+						printk(KERN_ALERT "-----------PFN #%d",k);
+					}
+				}
+			}
+		}
+	}
+
+}
 
 static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int domid){
 
@@ -618,28 +663,37 @@ static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int dom
 	//struct flex_array *proc_cursor;
 	int i;
 	//int *bit_result;
-	unsigned long *dom_cursor;
+	unsigned long **dom_cursor;
 	unsigned long *proc_cursor;
 	//unsigned int pid;
 	//unsigned long *dst;
 
-	dom_cursor = *(monitor_dom_list+(sizeof(unsigned long*)*domid));
+	//dom_cursor = (monitor_dom_list+(sizeof(unsigned long*)*domid));
+	dom_cursor = monitor_dom_list[domid];
 	if(!dom_cursor){
-		//printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
+		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,domid);
+		return -1;
+	}		
+
+	if(mmu_mfn==0){
+		printk(KERN_ALERT "%s, A process in Dom:%u is attempting to add an entry.",__FUNCTION__,domid);
 		return -1;
 	}
 
 	for(i=0; i < MONITOR_MAX_PROCS; i++){
-		proc_cursor = dom_cursor+(sizeof(unsigned long*)*i);
+	//	proc_cursor = dom_cursor+(sizeof(unsigned long*)*i);
+		proc_cursor = dom_cursor[i];
 		if(proc_cursor){
 			
 			if(test_bit(mmu_mfn,proc_cursor)){
 				printk(KERN_ALERT "%s,Process #%d is attempting to change PTE",__FUNCTION__,i);
-				break;
+				return i;
 			}
 		}
 	}
-
+	
+	printk(KERN_ALERT "%s,Unwatched process, ignoring",__FUNCTION__);
+	return 0;
 
 /*
 	//Check if this VM has been reported

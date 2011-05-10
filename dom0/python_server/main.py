@@ -42,6 +42,7 @@ MONITOR_REPORT = MONITOR_IOC_MAGIC+1
 MONITOR_REGISTER = MONITOR_IOC_MAGIC+8
 MONITOR_DEREGISTER = MONITOR_IOC_MAGIC+9
 MONITOR_WATCH = MONITOR_IOC_MAGIC+10
+MONITOR_DUMP = MONITOR_IOC_MAGIC+11
 MONITOR_MIN_DOMID = 1
 MONITOR_MAX_DOMID = 255
 
@@ -126,7 +127,7 @@ def watch_domain_register(path, xs):
         #print "Watching path for report: "+watch_path
         #xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_report, xs)
         print "Watching path for watch_report: "+watch_path
-        xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_report, xs)
+        xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_watchreport, xs)
         
 
         print "Domain "+str(value)+" registered"
@@ -267,7 +268,7 @@ def watch_domain_watchreport(path, xs):
         
         ops = Monitor(MONITOR_DEVICE)
         procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],pfnArr.buffer_info()[0],count)
-        ops.doMonitorOp(MONITOR_REPORT, procStruct)
+        ops.doMonitorOp(MONITOR_WATCH, procStruct)
         ops.close()
         
         print "Reported"     
@@ -321,6 +322,11 @@ def clean(xs):
     xs.rm(th,MONITOR_XS_REGISTER_PATH)
     xs.transaction_end(th)       
 
+def dump():
+	ops = Monitor(MONITOR_DEVICE)
+	ops.doMonitorOp(MONITOR_DUMP, 0)
+	ops.close()
+
 
 def main():
 
@@ -330,6 +336,10 @@ def main():
 
     if len(sys.argv) > 1 and sys.argv[1]=='clean':
         clean(xs)
+        return
+
+    if len(sys.argv) > 1 and sys.argv[1]=='dump':
+        dump()
         return
 
     th = xs.transaction_start()    

@@ -48,6 +48,7 @@
 #define MONITOR_REGISTER MONITOR_IOC_MAGIC+8
 #define MONITOR_DEREGISTER MONITOR_IOC_MAGIC+9
 #define MONITOR_WATCH MONITOR_IOC_MAGIC+10
+#define MONITOR_DUMP MONITOR_IOC_MAGIC+11
 
 //Debug enabled
 #define MONITOR_DEBUG 1
@@ -173,7 +174,7 @@ Grant table and Interdomain Variables
 static struct as_sring *sring;
 static monitor_share_info_t *monitor_share_info;
 //static struct flex_array *monitor_dom_list;
-static unsigned long **monitor_dom_list;
+static unsigned long ***monitor_dom_list;
 
 
 /************************************************************************
@@ -184,7 +185,7 @@ static int monitor_register(monitor_share_info_t *info);
 //static int monitor_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
 //static int monitor_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
 static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int domid);
-
+static void monitor_print_watched(void);
 /************************************************************************
 Grant table and Interdomain Functions
 ************************************************************************/

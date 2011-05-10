@@ -194,14 +194,14 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 	mmu_update-> uint64_t val;  // New contents of PTE.
 	 */
 
-	pteval_t tmp_ptev;
+	pte_t *tmp_pte;
 	struct request_t *ring_req;
 	int notify;
 
 	if(count<1 && malpage_share_info){
 		return 0;
 	}
-	//printk(KERN_ALERT "malpage_mmu_update:%u",domid);
+	printk(KERN_ALERT "malpage_mmu_update:%u",domid);
 
 	spin_lock(&malpage_mmu_info_lock);
 	// Write a request into the ring and update the req-prod pointer
@@ -209,10 +209,10 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 	ring_req->operation = MALPAGE_RING_MMUUPDATE;
 	malpage_share_info->fring.req_prod_pvt += 1;
 
-	tmp_ptev = req->ptr;
-	ring_req->mmu_mfn = ((tmp_ptev & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
+	tmp_pte = (pte_t*)req->ptr;
+	//ring_req->mmu_mfn = ((tmp_pte->pte & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
 	//pte.pte & PTE_PFN_MASK) >> PAGE_SHIFT //A section of pte_mfn().
-	//ring_req->mmu_mfn = pte_mfn(tmp_pte); //Fails horribly
+	ring_req->mmu_mfn = pte_mfn(*tmp_pte); //Fails horribly
 
 	ring_req->mmu_val = req->val;
 	
@@ -229,7 +229,7 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
 
-	pteval_t tmp_ptev;
+	//pte_t *tmp_pte;
 	struct request_t *ring_req;
 	int notify;
 	int i;
@@ -238,7 +238,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 		return 0;
 	}
 
-	//	printk(KERN_ALERT "MULTI:%d",count);
+	//printk(KERN_ALERT "MULTI:%d",count);
 
 	spin_lock(&malpage_mmu_info_lock);
 	for(i=0; i < count; i++){
@@ -248,10 +248,17 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 	
 		malpage_share_info->fring.req_prod_pvt += 1;
 
-		tmp_ptev = req[i].ptr;
-		ring_req->mmu_mfn = ((tmp_ptev & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
-		//pte.pte & PTE_PFN_MASK) >> PAGE_SHIFT //A section of pte_mfn().
-		//ring_req->mmu_mfn = pte_mfn(tmp_pte); //Fails horribly
+		//tmp_pte = (pte_t*)phys_to_virt(req[i].ptr);
+		//tmp_pte = (pte_t*)phys_to_virt(machine_to_phys(req[i].ptr));
+		//ring_req->mmu_mfn = PFN_DOWN(req[i].ptr);
+
+		printk(KERN_ALERT "MULTI: %p\n",(void*)req[i].ptr);
+
+
+		ring_req->mmu_mfn = ((tmp_pte & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
+		//tmp_pte & PTE_PFN_MASK) >> PAGE_SHIFT //A section of pte_mfn().
+		//ring_req->mmu_mfn = pte_mfn(*tmp_pte); //Fails horribly
+
 
 		ring_req->mmu_val = req[i].val;
 		ring_req->domid = malpage_share_info->domid;
@@ -613,9 +620,9 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	int vma_total;
 	int vma_count;
 	int anon_vma_count;
-	int heap_count;
-	int data_count;
-	int code_count;
+	//int heap_count;
+	//int data_count;
+	//int code_count;
 	struct vm_area_struct *current_vma;
 	struct vm_area_struct *current_anon_vma;
 	//struct anon_vma *current_anon_vma;
@@ -630,8 +637,8 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	pfn_ll_node *pfn_root;
 	pfn_ll_node *tmp_pfn_root;
 	pfn_ll_node *tmp_pfn;
-	struct list_head *node;
-	struct list_head *first_node;
+	//struct list_head *node;
+	//struct list_head *first_node;
 
 	//Init list
 	root_exists = 0;
@@ -972,15 +979,12 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 		list_pudt = (pud_t*)pgd_page_vaddr(list_pgdt[pgd_count]);
 		for(pud_count = 0; pud_count < end_pud && list_pudt; pud_count++){
 
-			printk(KERN_ALERT "2.0\n");
 
 			//If the PUD Entry actually exists
 			if(!pud_present(list_pudt[pud_count]) || pud_none(list_pudt[pud_count]) || pud_bad(list_pudt[pud_count])){
-				printk(KERN_ALERT "2.1\n");
 				pud_skip++;
 				continue;
 			}
-			printk(KERN_ALERT "2.2\n");
 			pud_valid++;
 
 			//
@@ -1693,7 +1697,7 @@ static int malpage_watch(pid_t procID,malpage_share_info_t *info) {
 	//gather report. notify monitor.
 
 	process_report_t *rep;
-	int i;
+	//int i;
 	struct task_struct *task;
 
 
