@@ -72,9 +72,11 @@
 #include <linux/bitmap.h> //For bitmap
 #include <linux/bitops.h>
 
+
+#include <xen/include/asm-x86/x86_64/page.h>
 //Dynamic Arrays
 //#include <linux/flex_array.h>
-#include "flex_array.c"
+//#include "flex_array.c"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("CHRISBENNINGER");
@@ -135,6 +137,8 @@ static int monitor_init(void) {
 	//Init the data store
 	monitor_dom_list = kzalloc(sizeof(unsigned long*)*MONITOR_MAX_VMS,GFP_KERNEL);
 	//monitor_dom_list = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_VMS,GFP_KERNEL);
+
+	maddr_to_virt(0);
 
 	return 0;
 }

@@ -254,10 +254,11 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 
 		printk(KERN_ALERT "MULTI: %p\n",(void*)req[i].ptr);
 
-
-		ring_req->mmu_mfn = ((tmp_pte & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
+		//tmp_pte = (pte_t*)(__va(req[i].ptr));
+		//ring_req->mmu_mfn = ((tmp_pte & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
 		//tmp_pte & PTE_PFN_MASK) >> PAGE_SHIFT //A section of pte_mfn().
 		//ring_req->mmu_mfn = pte_mfn(*tmp_pte); //Fails horribly
+		//ring_req->mmu_mfn = pte_mfn(__maddr_to_virt(req[i].ptr));
 
 
 		ring_req->mmu_val = req[i].val;
@@ -265,12 +266,13 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 
 		// Send a reqest to backend followed by an int if needed
 		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
-		//notify_remote_via_irq(malpage_share_info->irq);
+		notify_remote_via_irq(malpage_share_info->irq);
 	}
+	/*
 	if(count>0){
 		notify_remote_via_irq(malpage_share_info->irq);
 	}	
-
+	*/
 	spin_unlock(&malpage_mmu_info_lock);
 
 

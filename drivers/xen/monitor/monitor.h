@@ -124,7 +124,7 @@ struct request_t {
 	unsigned int pfn;
 	process_report_t report;
 	int domid;
-	unsigned long mmu_mfn;
+	uint64_t mmu_mfn;
 	uint64_t mmu_val;
 };
 
