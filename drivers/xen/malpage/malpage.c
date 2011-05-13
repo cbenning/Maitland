@@ -138,19 +138,41 @@ static int malpage_init(void) {
 	
 	//DANGEROUS, set the kernel mmu update intercept pointer
 	printk(KERN_ALERT ">malpage_init: setting mmu_update ptr.\n");
-	
 	kmalpage_mmu_update = &malpage_mmu_update;
 	if(kmalpage_mmu_update==NULL){
-		printk(KERN_ALERT ">malpage_init: failed settign mmu_update ptr.\n");	
+		printk(KERN_ALERT ">malpage_init: failed setting mmu_update ptr.\n");	
 	}
 	
 	printk(KERN_ALERT ">malpage_init: setting multi_mmu_update ptr.\n");
-	
 	kmalpage_multi_mmu_update = &malpage_multi_mmu_update;
 	if(kmalpage_multi_mmu_update==NULL){
-		printk(KERN_ALERT ">malpage_init: failed settign multi_mmu_update ptr.\n");	
+		printk(KERN_ALERT ">malpage_init: failed setting multi_mmu_update ptr.\n");	
 	}
-	
+
+	printk(KERN_ALERT ">malpage_init: setting mmuext_op ptr.\n");
+	kmalpage_mmuext_op = &malpage_mmuext_op;
+	if(kmalpage_mmuext_op==NULL){
+		printk(KERN_ALERT ">malpage_init: failed setting mmuext_op ptr.\n");	
+	}
+
+	printk(KERN_ALERT ">malpage_init: setting multi_mmuext_op ptr.\n");
+	kmalpage_multi_mmuext_op = &malpage_multi_mmuext_op;
+	if(kmalpage_multi_mmuext_op==NULL){
+		printk(KERN_ALERT ">malpage_init: failed setting multi_mmuext_op ptr.\n");	
+	}
+
+	printk(KERN_ALERT ">malpage_init: setting update_descriptor ptr.\n");
+	kmalpage_update_descriptor = &malpage_update_descriptor;
+	if(kmalpage_update_descriptor==NULL){
+		printk(KERN_ALERT ">malpage_init: failed setting update_descriptor ptr.\n");	
+	}
+
+	printk(KERN_ALERT ">malpage_init: setting multi_update_descriptor ptr.\n");
+	kmalpage_multi_update_descriptor = &malpage_multi_update_descriptor;
+	if(kmalpage_multi_update_descriptor==NULL){
+		printk(KERN_ALERT ">malpage_init: failed setting update_descriptor ptr.\n");	
+	}
+
 	malpage_mmu_info_lock = SPIN_LOCK_UNLOCKED; //Initialize the lock
 	//malpage_share_info_set=1;
 	return 0;
@@ -248,16 +270,17 @@ MMU EXTENDED COMMAND: perform additional MMU operations.
 
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
 
-	pteval_t *tmp_pte;
+	pte_t tmp_pte;
 	struct request_t *ring_req;
 	int notify;
 	int i;
 	unsigned long tmp;
-	unsigned long offset;
+	//unsigned long offset;
 	unsigned long mfn;
-	unsigned long pfn;
-	unsigned long *addr;
+	//unsigned long pfn;
+	//unsigned long *addr;
 	unsigned long cmd;
+	struct page *tmp_page;
 
 	if(count<1 && malpage_share_info){
 		return 0;
@@ -268,23 +291,20 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 
 		printk(KERN_ALERT "-MMU_MULTI_UPDATE\n");
 
+
+		//The ptr is a u64, with the last 4 bits being the command in 64-bit
+
 		//Chop off the least 4 bits, (little endian)
-		//tmp = ((unsigned long)(req[i].ptr));
-		//tmp = tmp & (ULONG_MAX-(MALPAGE_64_MMUPTR_TYPE_MASK-1));
-		//type = req[i].ptr & MALPAGE_64_MMUPTR_TYPE_MASK;
-		//cmd = req[i].ptr & (sizeof(l1_pgentry_t)-1);	
 		cmd = req[i].ptr & (sizeof(u64)-1);	
+		printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
 
-		if(cmd==MMU_NORMAL_PT_UPDATE){
-
-			printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
-
-			tmp = req[i].ptr-cmd;
+			tmp = req[i].ptr-cmd; //Ignore the last 4 bits
 			mfn = tmp >> PAGE_SHIFT;
 			
 			if(mfn){
 
 				printk(KERN_ALERT "--mfn: %lu\n",mfn);
+
 				// Write a request into the ring and update the req-prod pointer
 				ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
 				ring_req->operation = MALPAGE_RING_MMUUPDATE;
@@ -297,61 +317,55 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 				// Send a reqest to backend followed by an int if needed
 				RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
 				notify_remote_via_irq(malpage_share_info->irq);
-
+				
 			}
+/*
+		switch(cmd){
+
+			case MMU_NORMAL_PT_UPDATE:
+
+				printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
+
+				tmp = req[i].ptr-cmd; //Ignore the last 4 bits
+				mfn = tmp >> PAGE_SHIFT;
+				
+				if(mfn){
+
+					printk(KERN_ALERT "--mfn: %lu\n",mfn);
+					
+					//tmp_pte = mfn_pte(mfn,PAGE_KERNEL);
+					//tmp_page = pte_page(tmp_pte);
+					//printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
+					
+					// Write a request into the ring and update the req-prod pointer
+					ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
+					ring_req->operation = MALPAGE_RING_MMUUPDATE;
+					malpage_share_info->fring.req_prod_pvt += 1;
+
+					ring_req->mmu_mfn = mfn;	
+					ring_req->mmu_val = req[i].val;
+					ring_req->domid = malpage_share_info->domid;
+
+					// Send a reqest to backend followed by an int if needed
+					RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
+					notify_remote_via_irq(malpage_share_info->irq);
+					
+				}
+				
+			break;		
+			case MMU_MACHPHYS_UPDATE:
+				printk(KERN_ALERT "--type: MMU_MACHPHYS_UPDATE\n");
+			break;
+			case MMU_PT_UPDATE_PRESERVE_AD:
+				printk(KERN_ALERT "--type: MMU_PT_UPDATE_PRESERVE_AD\n");
+			break;
+			default:
+				printk(KERN_ALERT "--type: UNKNOWN\n");
 			
-		
-		}
-		else if(cmd==MMU_MACHPHYS_UPDATE){
-			printk(KERN_ALERT "--type: MMU_MACHPHYS_UPDATE\n");
-		}
-		else if(cmd==MMU_PT_UPDATE_PRESERVE_AD){
-			printk(KERN_ALERT "--type: MMU_PT_UPDATE_PRESERVE_AD\n");
-		}
-		else{
-			printk(KERN_ALERT "--type: UNKNOWN\n");
-		}
-
-		/*
-		printk(KERN_ALERT "MULTI: tmp:%llu\n",tmp);
-		offset = tmp & ~PAGE_MASK;
-		printk(KERN_ALERT "MULTI: offset:%lu\n",offset);
-		mfn = (tmp & PTE_PFN_MASK) >> PAGE_SHIFT;
-		printk(KERN_ALERT "MULTI: mfn:%lu\n",mfn);
-		pfn = mfn_to_pfn(mfn);
-		printk(KERN_ALERT "MULTI: pfn:%lu\n",pfn);
-		
-		addr = (unsigned long*)pfn_to_kaddr(pfn);
-		printk(KERN_ALERT "MULTI: addr:%p\n",addr);
-		addr = addr+offset;
-		printk(KERN_ALERT "MULTI: addr+offset:%p\n",addr);
-		
-		tmp_pte = (pte_t*)addr;
-
-		*/
-		/*
-		offset = 0;
-		offset = tmp_pte.pte & ~PAGE_MASK;
-		PFN_DOWN(machine.maddr)
-
-		tmp_pte = machine_to_phys(req[i].ptr);
-		*/
-		
-		//tmp_pte = (pte_t*)(__va(__pa(tmp)));
-		//ring_req->mmu_mfn = ((tmp_pte & PTE_PFN_MASK) >> PAGE_SHIFT); //A section of pte_mfn().
-		//tmp_pte & PTE_PFN_MASK) >> PAGE_SHIFT //A section of pte_mfn().
-		//ring_req->mmu_mfn = pte_mfn(*tmp_pte); //Fails horribly
-		//ring_req->mmu_mfn = pte_mfn(__maddr_to_virt(req[i].ptr));
-
-		//printk(KERN_ALERT "MULTI: ADDR:%llu, MFN:%lu \n",tmp, ring_req->mmu_mfn);
-
+		}*/
 
 	}
-	/*
-	if(count>0){
-		notify_remote_via_irq(malpage_share_info->irq);
-	}	
-	*/
+
 	spin_unlock(&malpage_mmu_info_lock);
 
 
@@ -359,7 +373,29 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 }
 
 
+static int malpage_mmuext_op(struct mmuext_op *op, int count, int *success_count, domid_t domid){
+	//printk(KERN_ALERT "-MMUEXT_OP\n");
+	return 0;
+}
 
+
+static int malpage_multi_mmuext_op(struct multicall_entry *mcl, struct mmuext_op *op, int count, int *success_count, domid_t domid){
+
+	//printk(KERN_ALERT "-MULTI_MMUEXT_OP\n");
+	return 0;
+}
+
+static int malpage_update_descriptor(u64 ma, u64 desc){
+
+	printk(KERN_ALERT "-UPDATE_DESCRIPTOR\n");
+	return 0;
+}
+
+static int malpage_multi_update_descriptor(struct multicall_entry *mcl, u64 maddr,struct desc_struct desc){
+
+	printk(KERN_ALERT "-MULTI_UPDATE_DESCRIPTOR\n");
+	return 0;
+}
 
 
 /*

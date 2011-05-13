@@ -84,8 +84,16 @@
 //MALPAGE:START
 int (*kmalpage_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid) = NULL;
 int (*kmalpage_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid) = NULL;
+int (*kmalpage_mmuext_op)(struct mmuext_op *op, int count, int *success_count, domid_t domid) = NULL;
+int (*kmalpage_multi_mmuext_op)(struct multicall_entry *mcl, struct mmuext_op *op, int count, int *success_count, domid_t domid) = NULL;
+int (*kmalpage_update_descriptor(u64 ma, u64 desc) = NULL;
+int (*kmalpage_multi_update_descriptor(struct multicall_entry *mcl, u64 maddr,struct desc_struct desc) = NULL;
 EXPORT_SYMBOL(kmalpage_mmu_update);
 EXPORT_SYMBOL(kmalpage_multi_mmu_update);
+EXPORT_SYMBOL(kmalpage_mmuext_op);
+EXPORT_SYMBOL(kmalpage_multi_mmuext_op);
+EXPORT_SYMBOL(kmalpage_update_descriptor);
+EXPORT_SYMBOL(kmalpage_multi_update_descriptor);
 //MALPAGE:END
 
 static int kernel_init(void *);

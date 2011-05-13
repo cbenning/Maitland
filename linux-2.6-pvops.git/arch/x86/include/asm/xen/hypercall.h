@@ -226,21 +226,14 @@ HYPERVISOR_set_trap_table(struct trap_info *table)
 }
 
 
-//TODO
 //MALPAGE:START
 extern int (*kmalpage_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid);
 extern int (*kmalpage_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid);
-extern int (*kmalpage_update_va_mapping)(unsigned long va, pte_t new_val, unsigned long flags);
-//static inline void set_kmalpage_mmu_update(int (*new_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid)){
-//		kmalpage_mmu_update = new_mmu_update;
-//}
-
-//static inline void set_kmalpage_multi_mmu_update(int (*new_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid)){
-//		kmalpage_multi_mmu_update = new_multi_mmu_update;
-//}
-
-//EXPORT_SYMBOL(set_kmalpage_mmu_update);
-//EXPORT_SYMBOL(set_kmalpage_multi_mmu_update);
+extern int (*kmalpage_mmuext_op)(struct mmuext_op *op, int count, int *success_count, domid_t domid);
+extern int (*kmalpage_multi_mmuext_op)(struct multicall_entry *mcl, struct mmuext_op *op, int count, int *success_count, domid_t domid);
+extern int (*kmalpage_update_descriptor(u64 ma, u64 desc);
+extern int (*kmalpage_multi_update_descriptor(struct multicall_entry *mcl, u64 maddr,struct desc_struct desc);
+//MALPAGE:END
 
 static inline int
 HYPERVISOR_mmu_update(struct mmu_update *req, int count,
@@ -251,26 +244,24 @@ HYPERVISOR_mmu_update(struct mmu_update *req, int count,
 	mmu_update-> uint64_t val;  // New contents of PTE.
 	 */
 	
-	if(domid != 0){
-		
-		if(kmalpage_mmu_update!=NULL){
-			//printk(KERN_ALERT "HYPERVISOR_mmu_update:%u",domid);
-			kmalpage_mmu_update(req,count,success_count,domid);
-		}
-		else{
-			//printk(KERN_ALERT "HYPERVISOR_mmu_update, no pointer set though.");
-		}
+	if(kmalpage_mmu_update!=NULL){
+		kmalpage_mmu_update(req,count,success_count,domid);
 	}
 
 	return _hypercall4(int, mmu_update, req, count, success_count, domid);
 }
-//MALPAGE:END
+
 
 
 static inline int
 HYPERVISOR_mmuext_op(struct mmuext_op *op, int count,
 		     int *success_count, domid_t domid)
-{
+{	
+	//MALPAGE
+	if(kmalpage_mmuext_op!=NULL){
+		kmalpage_mmuext_op(op,count,success_count,domid);
+	}
+
 	return _hypercall4(int, mmuext_op, op, count, success_count, domid);
 }
 
@@ -365,6 +356,12 @@ static inline int
 HYPERVISOR_update_descriptor(u64 ma, u64 desc)
 {
 	if (sizeof(u64) == sizeof(long))
+
+		//MALPAGE
+		if(kmalpage_update_descriptor!=NULL){
+			kmalpage_update_descriptor(ma,desc);
+		}
+
 		return _hypercall2(int, update_descriptor, ma, desc);
 	return _hypercall4(int, update_descriptor, ma, ma>>32, desc, desc>>32);
 }
@@ -556,8 +553,15 @@ MULTI_update_descriptor(struct multicall_entry *mcl, u64 maddr,
 {
 	mcl->op = __HYPERVISOR_update_descriptor;
 	if (sizeof(maddr) == sizeof(long)) {
+
+		//MALPAGE
+		if(kmalpage_multi_update_descriptor!=NULL){
+			kmalpage_multi_update_descriptor(mcl,maddr,desc);
+		}
+
 		mcl->args[0] = maddr;
 		mcl->args[1] = *(unsigned long *)&desc;
+
 	} else {
 		mcl->args[0] = maddr;
 		mcl->args[1] = maddr >> 32;
@@ -575,22 +579,14 @@ MULTI_memory_op(struct multicall_entry *mcl, unsigned int cmd, void *arg)
 }
 
 
-//TODO:MALPAGE
 static inline void
 MULTI_mmu_update(struct multicall_entry *mcl, struct mmu_update *req,
 		 int count, int *success_count, domid_t domid)
 {
-
-	if(domid != 0){
-		
-		if(kmalpage_multi_mmu_update!=NULL){
-			//printk(KERN_ALERT "MULTI_mmu_update:%u",domid);
-			kmalpage_multi_mmu_update(mcl,req,count,success_count,domid);
-		}
-		else{
-			//printk(KERN_ALERT "MULTI_mmu_update, no pointer set though.");
-		}
-	}	
+	//MALPAGE
+	if(kmalpage_multi_mmu_update!=NULL){
+		kmalpage_multi_mmu_update(mcl,req,count,success_count,domid);
+	}
 	
 	mcl->op = __HYPERVISOR_mmu_update;
 	mcl->args[0] = (unsigned long)req;
@@ -603,6 +599,11 @@ static inline void
 MULTI_mmuext_op(struct multicall_entry *mcl, struct mmuext_op *op, int count,
 		int *success_count, domid_t domid)
 {
+	//MALPAGE
+	if(kmalpage_multi_mmuext_op!=NULL){
+		kmalpage_multi_mmuext_op(mcl,op,count,success_count,domid);
+	}
+
 	mcl->op = __HYPERVISOR_mmuext_op;
 	mcl->args[0] = (unsigned long)op;
 	mcl->args[1] = count;
