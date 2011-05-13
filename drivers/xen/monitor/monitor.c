@@ -64,19 +64,17 @@
 #include <asm/hypervisor.h>
 #include <linux/slab.h>
 
-//Custom includes
-#include "monitor.h"
-
 
 #include <linux/bootmem.h> //For max_pfn
 #include <linux/bitmap.h> //For bitmap
 #include <linux/bitops.h>
 
-
-#include <xen/include/asm-x86/x86_64/page.h>
 //Dynamic Arrays
 //#include <linux/flex_array.h>
 //#include "flex_array.c"
+
+//Custom includes
+#include "monitor.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("CHRISBENNINGER");
@@ -138,8 +136,6 @@ static int monitor_init(void) {
 	monitor_dom_list = kzalloc(sizeof(unsigned long*)*MONITOR_MAX_VMS,GFP_KERNEL);
 	//monitor_dom_list = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_VMS,GFP_KERNEL);
 
-	maddr_to_virt(0);
-
 	return 0;
 }
 
@@ -147,6 +143,7 @@ static int monitor_init(void) {
 
 
 static void monitor_exit(void) {
+
 	printk(KERN_ALERT "Unloading...\n");
 	
 	/* Unregister the device */
@@ -155,7 +152,6 @@ static void monitor_exit(void) {
 	cdev_del(&monitor_cdev);
 	class_destroy(monitor_class);
 	//unregister_chrdev(monitor_major, DEVICE_NAME);
-	
 
 	printk(KERN_ALERT "Unloaded.\n");
 }
@@ -171,7 +167,6 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 	printk(KERN_ALERT "monitor_ioctl\n");
 	printk(KERN_ALERT "command: %d.\n", cmd);
 	#endif
-	
 
 
 	switch(cmd){
@@ -233,10 +228,6 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 Grant table and Interdomain Functions
 
 ************************************************************************/
-
-
-
-
 
 static monitor_share_info_t* monitor_populate_info(unsigned long arg){
 
@@ -390,8 +381,6 @@ static int monitor_register(monitor_share_info_t *info){
 	#endif
 	
 	//Setup this domain with it's own list of processes
-	//tmp_procs = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_PROCS,GFP_KERNEL);
-	//flex_array_put(monitor_dom_list,info->domid,tmp_procs,GFP_KERNEL);
 	monitor_dom_list[info->domid] = kzalloc(sizeof(unsigned long*)*MONITOR_MAX_PROCS,GFP_KERNEL);
 
 
@@ -430,8 +419,6 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
 			//Get a copy of the request
 			memcpy(&req, RING_GET_REQUEST(&monitor_share_info->bring, rc), sizeof(req));
-
-			//printk(KERN_ALERT "Report summary: procid: %u, domid: %u, age: %u, numpfns: %u\n",req.report.process_id, req.report.domid, req.report.process_age, req.report.pfn_list_length);
 
 			// update the req-consumer
 			monitor_share_info->bring.req_cons = ++rc;
@@ -472,16 +459,6 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 			//notify_remote_via_irq(monitor_share_info->irq);
 			notify_remote_via_irq(monitor_share_info->evtchn);
 
-			/*if(monitor_share_info->bring.rsp_prod_pvt == monitor_share_info->bring.req_cons) {
-				  RING_FINAL_CHECK_FOR_REQUESTS(&monitor_share_info->bring, more_to_do);
-			} else if (RING_HAS_UNCONSUMED_REQUESTS(&monitor_share_info->bring)) {
-				  more_to_do = 1;
-			}
-			if(notify) {
-				  printk("\nxen:Dom0: Send notify to DomU");
-				  notify_remote_via_irq(monitor_share_info->irq);
-			}
-			*/
 		}
 
 		return IRQ_HANDLED;
@@ -540,20 +517,15 @@ static int monitor_report(process_report_t *rep) {
 
 static int monitor_watch(process_report_t *rep){
 
-	//struct flex_array *dom_cursor;
-	//struct flex_array *proc_cursor;
-	//int bit_on;
 	int i;
 	unsigned long **dom_cursor;
 	unsigned long *proc_cursor;
-
 
 	dom_cursor = NULL;
 	proc_cursor = NULL;
 
 	printk(KERN_ALERT "%s, setting watch for proc %d in Dom %d.",__FUNCTION__,rep->process_id,rep->domid);
 
-//	dom_cursor = (monitor_dom_list+(sizeof(unsigned long*)*rep->domid));
 	dom_cursor = monitor_dom_list[rep->domid];
 	if(!dom_cursor){
 		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
@@ -561,67 +533,19 @@ static int monitor_watch(process_report_t *rep){
 	}
 
 	proc_cursor = kzalloc(MONITOR_MAX_PFNS/8,GFP_KERNEL);
-
 	if(!bitmap_empty(proc_cursor,MONITOR_MAX_PFNS)){
 		printk(KERN_ALERT "%s, Unable to allocate bitmap for process, ignoring watch.",__FUNCTION__);
 		return -1;
 	}
 
 	for(i=0; i < rep->pfn_list_length; i++){
-		//bitmap_set(proc_cursor,rep->pfn_list[i],MONITOR_MAX_PFNS); //Set all of the PFNs to On
-
 		//printk(KERN_ALERT "%s, setting bit %d.",__FUNCTION__,rep->pfn_list[i]);
 		set_bit(rep->pfn_list[i],proc_cursor);
 	}
 
-
 	dom_cursor[rep->process_id] = proc_cursor;
 	monitor_dom_list[rep->domid] = dom_cursor;
 
-/*
-	printk(KERN_ALERT "1\n");
-
-	//Check if this VM has been reported
-	dom_cursor = flex_array_get(monitor_dom_list,rep->domid);
-
-	printk(KERN_ALERT "2\n");
-	if(dom_cursor == NULL){
-		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,rep->domid);
-		return -1;
-	}
-
-	printk(KERN_ALERT "3\n");
-	bit_on = 1;
-
-	#ifdef MONITOR_DEBUG
-	printk(KERN_ALERT "%s, Looking for proc:%ul in dom:%ul",__FUNCTION__,rep->process_id,rep->domid);
-	#endif
-
-	proc_cursor = flex_array_get(dom_cursor,rep->process_id);
-
-	printk(KERN_ALERT "4\n");
-
-	//Need to create an empty one
-	if(proc_cursor == NULL){
-		//Setup this domain with it's own list of processes
-		proc_cursor = flex_array_alloc(sizeof(int),MONITOR_MAX_PFNS,GFP_KERNEL);
-	}
-
-	printk(KERN_ALERT "5\n");
-
-	//Memory LEAK, FIXME
-	for(i=0; i < rep->pfn_list_length; i++){
-		flex_array_put(proc_cursor, rep->pfn_list[i], &bit_on, GFP_KERNEL); //Set all of the PFNs to On
-	}
-
-	printk(KERN_ALERT "6\n");
-
-	flex_array_put(dom_cursor,rep->process_id,proc_cursor,GFP_KERNEL);
-
-	#ifdef MONITOR_DEBUG
-	printk(KERN_ALERT "%s, Watch is now set for proc:%ul in dom:%ul",__FUNCTION__,rep->process_id,rep->domid);
-	#endif
-*/
 	return 0;
 }
 
@@ -658,21 +582,14 @@ static void monitor_print_watched(void){
 			}
 		}
 	}
-
 }
 
 static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int domid){
 
-	//struct flex_array *dom_cursor;
-	//struct flex_array *proc_cursor;
 	int i;
-	//int *bit_result;
 	unsigned long **dom_cursor;
 	unsigned long *proc_cursor;
-	//unsigned int pid;
-	//unsigned long *dst;
 
-	//dom_cursor = (monitor_dom_list+(sizeof(unsigned long*)*domid));
 	dom_cursor = monitor_dom_list[domid];
 	if(!dom_cursor){
 		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,domid);
@@ -685,7 +602,6 @@ static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int dom
 	}
 
 	for(i=0; i < MONITOR_MAX_PROCS; i++){
-	//	proc_cursor = dom_cursor+(sizeof(unsigned long*)*i);
 		proc_cursor = dom_cursor[i];
 		if(proc_cursor){
 			
@@ -697,30 +613,6 @@ static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int dom
 	}
 	
 	printk(KERN_ALERT "%s,Unwatched process, ignoring",__FUNCTION__);
-	return 0;
-
-/*
-	//Check if this VM has been reported
-	dom_cursor = flex_array_get(monitor_dom_list,domid);
-
-	if(dom_cursor == NULL){
-		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,domid);
-		return -1;
-	}
-
-	for(i=0; i < MONITOR_MAX_PROCS; i++){
-		proc_cursor = flex_array_get(dom_cursor,i);
-
-		//Searching through registered process' pages
-		if(proc_cursor){
-			bit_result = flex_array_get(proc_cursor,mmu_mfn);
-			if(*bit_result==1){
-				printk(KERN_ALERT "Process #%d is attempting to change PTE",__FUNCTION__,i);
-			}
-		}
-	}
-*/
-
 	return 0;
 
 }
@@ -766,60 +658,6 @@ static process_report_t* monitor_populate_report(unsigned long arg){
 
 }
 
-
-//Borrowed this code and tweaked from the blkback driver
-/*
-static inline unsigned long vaddr(unsigned long *addr){
-	unsigned long pfn = page_to_pfn(virt_to_page(addr));
-	return (unsigned long)pfn_to_kaddr(pfn);
-}*/
-
-
-
-/*
-static unsigned long monitor_map_pageblock(process_report_t *rep){
-
-	struct vm_struct** v_start; //processes vm area
-	struct gnttab_map_grant_ref ops[rep->pfn_list_length];
-	int i;
-
-	// Get a vmarea large enough to hold processes pages. No actual mappings are created.
-	v_start = alloc_vm_area((size_t)(PAGE_SIZE*(rep->pfn_list_length)));
-
-	if (v_start == 0) {
-		free_vm_area(v_start);
-		printk(KERN_ALERT "monitor_map_pageblock: could not allocate page\n");
-		return -EFAULT;
-	}
-
-	//Map in the remote pages one by one
-	for (i=0; i < rep->pfn_list_length ; i++){
-		if(rep->gref_list[i]<0){
-			printk(KERN_ALERT "monitor_map_pageblock: gref is <0. Aborting\n");
-			return -EFAULT;
-		}
-
-		printk(KERN_ALERT "monitor_map_pageblock: HYPERVISOR mapping gref: %d\n",rep->gref_list[i]);
-		gnttab_set_map_op(&ops[i], (((unsigned long)(v_start->phys_addr))+(i*PAGE_SIZE)), GNTMAP_host_map|GNTMAP_readonly, rep->gref_list[i], rep->domid);
-		printk(KERN_ALERT "map_process: mapped pfn %lu\n",rep->pfn_list[i]);
-
-		if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops[i], rep->pfn_list_length)) {
-			printk(KERN_ALERT "monitor_map_pageblock: HYPERVISOR map grant ref failed\n");
-
-			return -EFAULT;
-		}
-		if (ops[i].status) {
-			printk(KERN_ALERT "monitor_map_pageblock:  HYPERVISOR map grant ref failed status = %d\n", ops[i].status);
-			printk(KERN_ALERT "monitor_map_pageblock:  ERR%d\n", ERR_PTR(ops[i].status));
-			return -EFAULT;
-		}
-
-	}
-
-	printk(KERN_ALERT "monitor_map_pageblock\n");
-	return (unsigned long)v_start->addr;
-}*/
- 
 
 static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid){
 
@@ -868,108 +706,6 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 	return v_start;
 
 }
-
-/* */
-/*static int monitor_map( monitor_share_info_t info) {*/
-
-/*      struct vm_struct *v_start;*/
-/*      as_sring_t *sring;*/
-/*      int err;*/
-/*      */
-/* 	  gref = 932;*/
-/*      info.gref = gref;*/
-/*      info.remoteDomain = 3;*/
-/*      info.evtchn = port;*/
-/*      */
-/*      printk(KERN_ALERT "\nxen: dom0: init_module with gref = %d", info.gref);*/
-/* */
-/*      // The following function reserves a range of kernel address space and*/
-/*      // allocates pagetables to map that range. No actual mappings are created.*/
-/*      v_start = alloc_vm_area(PAGE_SIZE);*/
-/*      if (v_start == 0) {*/
-/*            free_vm_area(v_start);*/
-/*            printk(KERN_ALERT "\nxen: dom0: could not allocate page");*/
-/*            return -EFAULT;*/
-/*      }*/
-/*      */
-/*         ops struct in paramaeres*/
-/*            host_addr, flags, ref*/
-/*         ops struct out parameters*/
-/*            status (zero if OK), handle (used to unmap later), dev_bus_addr*/
-/*      */
-/*      gnttab_set_map_op(&ops, (unsigned long)v_start->addr, GNTMAP_host_map, info.gref, info.remoteDomain); // flags, ref, domID */
-/* */
-/*      if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &ops, 1)) {*/
-/*            printk("\nxen: dom0: HYPERVISOR map grant ref failed");*/
-/*            return -EFAULT;*/
-/*      }*/
-/*      if (ops.status) {*/
-/*            printk("\nxen: dom0: HYPERVISOR map grant ref failed status = %d", ops.status);*/
-/*            return -EFAULT;*/
-/*      }*/
-/*     // printk(KERN_ALERT "\nxen: dom0: shared_page = %u, handle = %x, status = %x", (unsigned int)v_start->addr, ops.handle, ops.status);*/
-/*      // Used for unmapping*/
-/*      unmap_ops.host_addr = (unsigned long)(v_start->addr);*/
-/*      unmap_ops.handle = ops.handle;*/
-/*    */
-/*      */
-/*	  int i;*/
-/*      printk("\nBytes in page ");*/
-/*      for(i=0;i<=10;i++) {*/
-/*            printk("%c", ((char*)(v_start->addr))[i]);*/
-/*      }*/
-/*	*/
-
-/*      sring = (as_sring_t*)v_start->addr;*/
-/*      BACK_RING_INIT(&info.ring, sring, PAGE_SIZE);*/
-/* */
-/*      //Seetup an event channel to the frontend */
-/*      err = bind_interdomain_evtchn_to_irqhandler(info.remoteDomain, info.evtchn, monitor_irq_handle, 0, "dom0-backend", &info);*/
-/*        if (err < 0) {*/
-/*            printk("\nxen: dom0: init_module failed binding to evtchn !");*/
-/*            err = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &unmap_ops, 1);*/
-/*            return -EFAULT;*/
-/*      }*/
-/*      info.irq = err;*/
-/*     */
-/*      printk("\nxen: dom0: end init_module: int = %d", info.irq);*/
-/*      return 0;*/
-/*}*/
-/* */
-//static void cleanup_grant(void) {
-      //int ret;
- /*
-      printk("\nxen: dom0: cleanup_module");
-      // Unmap foreign frames
-      // ops.handle points to the pages that were initially mapped. Set in the
-      // __init() function
-      //ops.host_addr ponts to the heap where the pages were mapped
-      ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &unmap_ops, 1);
-      if (ret == 0) {
-            printk(" cleanup_module: unmapped shared frame");
-      } else {
-            printk(" cleanup_module: unmapped shared frame failed");
-      }
-      */
-//}
-
-/*
-static void monitor_dump_pages(unsigned long *addr, unsigned int numpages){
-
-	unsigned int j;
-	unsigned int i;
-
-	for( j = 0; j<MONITOR_DUMP_COUNT && j<numpages; j++){
-
-		//page = mfn_to_virt(mfnlist[j]);
-
-		for( i = 0; i < PAGE_SIZE; i++){
-			//printk(KERN_ALERT "%x",*(addr+i));
-		}
-	}
-
-	return;
-}*/
 
 
 static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_t *offp){

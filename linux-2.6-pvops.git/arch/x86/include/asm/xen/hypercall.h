@@ -230,7 +230,7 @@ HYPERVISOR_set_trap_table(struct trap_info *table)
 //MALPAGE:START
 extern int (*kmalpage_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid);
 extern int (*kmalpage_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid);
-
+extern int (*kmalpage_update_va_mapping)(unsigned long va, pte_t new_val, unsigned long flags);
 //static inline void set_kmalpage_mmu_update(int (*new_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid)){
 //		kmalpage_mmu_update = new_mmu_update;
 //}

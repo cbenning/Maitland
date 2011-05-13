@@ -109,6 +109,9 @@
 #define MALPAGE_GRANT_INVALID_REF	0
 #define MALPAGE_ULONG_STR_MAX 12
 
+#define MALPAGE_64_MMUPTR_SHIFT 4 //For killing the last 4 bits
+#define MALPAGE_64_MMUPTR_TYPE_MASK 16 //For ignoring the last 4 bits
+
 
 /************************************************************************
 Module Interface and Util Structs
@@ -154,7 +157,8 @@ struct request_t {
 	unsigned int pfn;
 	process_report_t report;
 	int domid;
-	uint64_t mmu_mfn;
+	//uint64_t mmu_mfn;
+	unsigned long mmu_mfn;
 	uint64_t mmu_val;
 };
 
@@ -164,7 +168,8 @@ struct response_t {
 	unsigned int pfn;
 	process_report_t report;
 	int domid;
-	uint64_t mmu_ptr;
+	//uint64_t mmu_ptr;
+	unsigned long mmu_ptr;
 	uint64_t mmu_val;
 };
  
