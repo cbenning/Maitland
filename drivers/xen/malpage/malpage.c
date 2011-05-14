@@ -149,6 +149,7 @@ static int malpage_init(void) {
 		printk(KERN_ALERT ">malpage_init: failed setting multi_mmu_update ptr.\n");	
 	}
 
+/*
 	printk(KERN_ALERT ">malpage_init: setting mmuext_op ptr.\n");
 	kmalpage_mmuext_op = &malpage_mmuext_op;
 	if(kmalpage_mmuext_op==NULL){
@@ -173,6 +174,19 @@ static int malpage_init(void) {
 		printk(KERN_ALERT ">malpage_init: failed setting update_descriptor ptr.\n");	
 	}
 
+
+	printk(KERN_ALERT ">malpage_init: setting update_va_mapping ptr.\n");
+	kmalpage_update_va_mapping = &malpage_update_va_mapping;
+	if(kmalpage_update_va_mapping==NULL){
+		printk(KERN_ALERT ">malpage_init: failed setting update_va_mapping ptr.\n");	
+	}
+
+	printk(KERN_ALERT ">malpage_init: setting multi_update_va_mapping ptr.\n");
+	kmalpage_multi_update_va_mapping= &malpage_multi_update_va_mapping;
+	if(kmalpage_multi_update_va_mapping==NULL){
+		printk(KERN_ALERT ">malpage_init: failed setting update_va_mapping ptr.\n");	
+	}
+*/
 	malpage_mmu_info_lock = SPIN_LOCK_UNLOCKED; //Initialize the lock
 	//malpage_share_info_set=1;
 	return 0;
@@ -289,37 +303,22 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 	spin_lock(&malpage_mmu_info_lock);
 	for(i=0; i < count; i++){
 
-		printk(KERN_ALERT "-MMU_MULTI_UPDATE\n");
+		printk(KERN_ALERT "-MMU_MULTI_UPDATE-------\n");
 
 
 		//The ptr is a u64, with the last 4 bits being the command in 64-bit
 
 		//Chop off the least 4 bits, (little endian)
-		cmd = req[i].ptr & (sizeof(u64)-1);	
-		printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
+		//cmd = req[i].ptr & (sizeof(u64)-1);	
+		cmd = req[i].ptr & (MALPAGE_64_MMUPTR_TYPE_MASK);	
 
-			tmp = req[i].ptr-cmd; //Ignore the last 4 bits
-			mfn = tmp >> PAGE_SHIFT;
-			
-			if(mfn){
+		printk(KERN_ALERT "sizeof(uint64_t): %lu\n",sizeof(uint64_t));
+		printk(KERN_ALERT "sizeof(unsigned long): %lu\n",sizeof(unsigned long));
+		printk(KERN_ALERT "sizeof(unsigned long long): %lu\n",sizeof(unsigned long long));
+		printk(KERN_ALERT "PTR: %llu\n",req[i].ptr);
+		printk(KERN_ALERT "CMD: %lx\n",(unsigned long)cmd);
+		printk(KERN_ALERT "VAL: %llu\n",req[i].val);
 
-				printk(KERN_ALERT "--mfn: %lu\n",mfn);
-
-				// Write a request into the ring and update the req-prod pointer
-				ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
-				ring_req->operation = MALPAGE_RING_MMUUPDATE;
-				malpage_share_info->fring.req_prod_pvt += 1;
-
-				ring_req->mmu_mfn = mfn;	
-				ring_req->mmu_val = req[i].val;
-				ring_req->domid = malpage_share_info->domid;
-
-				// Send a reqest to backend followed by an int if needed
-				RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
-				notify_remote_via_irq(malpage_share_info->irq);
-				
-			}
-/*
 		switch(cmd){
 
 			case MMU_NORMAL_PT_UPDATE:
@@ -334,8 +333,8 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 					printk(KERN_ALERT "--mfn: %lu\n",mfn);
 					
 					//tmp_pte = mfn_pte(mfn,PAGE_KERNEL);
-					//tmp_page = pte_page(tmp_pte);
-					//printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
+					tmp_page = pfn_to_page(mfn_to_pfn(mfn));
+					printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
 					
 					// Write a request into the ring and update the req-prod pointer
 					ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
@@ -362,7 +361,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 			default:
 				printk(KERN_ALERT "--type: UNKNOWN\n");
 			
-		}*/
+		}
 
 	}
 
@@ -387,21 +386,52 @@ static int malpage_multi_mmuext_op(struct multicall_entry *mcl, struct mmuext_op
 
 static int malpage_update_descriptor(u64 ma, u64 desc){
 
-	printk(KERN_ALERT "-UPDATE_DESCRIPTOR\n");
+	//printk(KERN_ALERT "-UPDATE_DESCRIPTOR\n");
 	return 0;
 }
 
 static int malpage_multi_update_descriptor(struct multicall_entry *mcl, u64 maddr,struct desc_struct desc){
 
-	printk(KERN_ALERT "-MULTI_UPDATE_DESCRIPTOR\n");
+	//printk(KERN_ALERT "-MULTI_UPDATE_DESCRIPTOR\n");
 	return 0;
 }
 
 
+static int malpage_update_va_mapping(unsigned long va, pte_t new_val, unsigned long flags){
+
+	struct page* tmp_page;
+
+	if(virt_addr_valid(va)){
+		tmp_page = virt_to_page(va);
+		printk(KERN_ALERT "-UPDATE_VA_MAPPING\n");
+		if(tmp_page){
+			//tmp_page = pte_page(*((pte_t*)va));
+			printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
+		}
+	}
+
+	return 0;
+}
+
+static int malpage_multi_update_va_mapping(struct multicall_entry *mcl, unsigned long va,pte_t new_val, unsigned long flags){
+
+	struct page* tmp_page;
+
+	if(virt_addr_valid(va)){
+		tmp_page = virt_to_page(va);
+		printk(KERN_ALERT "-UPDATE_VA_MAPPING\n");
+		if(tmp_page){
+			//tmp_page = pte_page(*((pte_t*)va));
+			printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
+		}
+	}
+	return 0;
+}
+
 /*
 Lots of useful stuff in pid.h/pid.c
 */
-static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg) {
+static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg){
 
 	pid_t procID;
 	struct task_struct *task;

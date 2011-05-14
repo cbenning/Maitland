@@ -30,7 +30,7 @@ int main( int argc, const char* argv[] ){
 		//memcpy(&(empty_var[i*NUMPAGES]),&tmp, sizeof(tmp));
 	}
 
-	for(i=0; i <= 5; i++){
+	for(i=0; i <= 10; i++){
 		printf("Sleeping for %d...\n",i);
 		sleep(1);
 	}

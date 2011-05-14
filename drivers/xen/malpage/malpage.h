@@ -110,7 +110,7 @@
 #define MALPAGE_ULONG_STR_MAX 12
 
 #define MALPAGE_64_MMUPTR_SHIFT 4 //For killing the last 4 bits
-#define MALPAGE_64_MMUPTR_TYPE_MASK 16 //For ignoring the last 4 bits
+#define MALPAGE_64_MMUPTR_TYPE_MASK 7ul //For ignoring the last 4 bits
 
 
 /************************************************************************
@@ -218,6 +218,8 @@ static int malpage_mmuext_op(struct mmuext_op *op, int count, int *success_count
 static int malpage_multi_mmuext_op(struct multicall_entry *mcl, struct mmuext_op *op, int count, int *success_count, domid_t domid);
 static int malpage_update_descriptor(u64 ma, u64 desc);
 static int malpage_multi_update_descriptor(struct multicall_entry *mcl, u64 maddr,struct desc_struct desc);
+static int malpage_update_va_mapping(unsigned long va, pte_t new_val, unsigned long flags);
+static int malpage_multi_update_va_mapping(struct multicall_entry *mcl, unsigned long va,pte_t new_val, unsigned long flags);
 static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates,  int anon);
 static unsigned long addr_to_mfn(struct mm_struct *mm, unsigned long addr);
 static pfn_ll_node* pfnlist(struct task_struct *task, int uniq);
