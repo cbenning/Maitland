@@ -13,12 +13,18 @@ int main( int argc, const char* argv[] ){
 	char *empty_var;
 	int i;
 	int j;
+	pid_t pid;
 	char buf[100];
 	empty_var = calloc(NUMPAGES,PAGESIZE);
 	//printf("\npagesize %d\n",PAGESIZE);
 	int tmp;
 	extern int errno;  
 	void* pg_aligned;
+
+	if((pid = getpid()) <0){
+		perror("Unable to determine my PID");
+		return 0;
+	}
 
 	for(i=0; i < NUMPAGES; i++){
 
@@ -31,7 +37,7 @@ int main( int argc, const char* argv[] ){
 	}
 
 	for(i=0; i <= 10; i++){
-		printf("Sleeping for %d...\n",i);
+		printf("%d: Sleeping for %d...\n",pid,i);
 		sleep(1);
 	}
 	printf("Trying to set block as executable...\n");

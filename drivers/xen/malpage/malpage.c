@@ -278,6 +278,11 @@ MMU EXTENDED COMMAND: perform additional MMU operations.
    cache, installing a new LDT, or pinning & unpinning page-table
    pages (to ensure their reference count doesn’t drop to zero which
    would require a revalidation of all entries).
+MMU_PT_UPDATE_PRESERVE_AD:
+	A subcommand of the x86-only mmu_update() hypercall to allow batched 
+	updates of pagetable entries, while atomically preserving the current 
+	status of accessed and dirty bits in each entry. 
+  
 
 */
 
@@ -322,6 +327,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 		switch(cmd){
 
 			case MMU_NORMAL_PT_UPDATE:
+			case MMU_PT_UPDATE_PRESERVE_AD:
 
 				printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
 
@@ -354,9 +360,6 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 			break;		
 			case MMU_MACHPHYS_UPDATE:
 				printk(KERN_ALERT "--type: MMU_MACHPHYS_UPDATE\n");
-			break;
-			case MMU_PT_UPDATE_PRESERVE_AD:
-				printk(KERN_ALERT "--type: MMU_PT_UPDATE_PRESERVE_AD\n");
 			break;
 			default:
 				printk(KERN_ALERT "--type: UNKNOWN\n");
