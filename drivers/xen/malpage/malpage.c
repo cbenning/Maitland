@@ -293,6 +293,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 	struct request_t *ring_req;
 	int notify;
 	int i;
+    pid_t tmp_pid;
 	unsigned long tmp;
 	//unsigned long offset;
 	unsigned long mfn;
@@ -306,13 +307,11 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 	}
 
 	spin_lock(&malpage_mmu_info_lock);
-	for(i=0; i < count; i++){
 
+	for(i=0; i < count; i++){
 		printk(KERN_ALERT "-MMU_MULTI_UPDATE-------\n");
 
-
 		//The ptr is a u64, with the last 4 bits being the command in 64-bit
-
 		//Chop off the least 4 bits, (little endian)
 		//cmd = req[i].ptr & (sizeof(u64)-1);	
 		cmd = req[i].ptr & (MALPAGE_64_MMUPTR_TYPE_MASK);	
@@ -324,18 +323,20 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 		printk(KERN_ALERT "CMD: %lx\n",(unsigned long)cmd);
 		printk(KERN_ALERT "VAL: %llu\n",req[i].val);
 
-		switch(cmd){
+        tmp_pid = current_thread_info()->task->pid;
+        printk(KERN_ALERT "PID: %lu\n",(unsigned long)tmp_pid);
 
-			case MMU_NORMAL_PT_UPDATE:
-			case MMU_PT_UPDATE_PRESERVE_AD:
+
+        
+		//switch(cmd){
+		//	case MMU_NORMAL_PT_UPDATE:
+		//	case MMU_PT_UPDATE_PRESERVE_AD:
 
 				printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
-
 				tmp = req[i].ptr-cmd; //Ignore the last 4 bits
 				mfn = tmp >> PAGE_SHIFT;
 				
 				if(mfn){
-
 					printk(KERN_ALERT "--mfn: %lu\n",mfn);
 					
 					//tmp_pte = mfn_pte(mfn,PAGE_KERNEL);
@@ -354,15 +355,16 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 					// Send a reqest to backend followed by an int if needed
 					RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
 					notify_remote_via_irq(malpage_share_info->irq);
-					
+				    	
+					printk(KERN_ALERT "\nI just sent a notification to Dom0\n");
 				}
 				
-			break;		
-			case MMU_MACHPHYS_UPDATE:
-				printk(KERN_ALERT "--type: MMU_MACHPHYS_UPDATE\n");
-			break;
-			default:
-				printk(KERN_ALERT "--type: UNKNOWN\n");
+		//	break;		
+		//	case MMU_MACHPHYS_UPDATE:
+		//		printk(KERN_ALERT "--type: MMU_MACHPHYS_UPDATE\n");
+    	//	break;
+		//	default:
+		//		printk(KERN_ALERT "--type: UNKNOWN\n");
 			
 		}
 
@@ -510,11 +512,8 @@ static ssize_t malpage_read_gref(struct file *filp, char __user *buffer, size_t 
 
 }
 
-*/
 
 
-
-/*
 filp - file pointer
 count - size of requested data
 buff - pointer to user buffer where data is to be copied

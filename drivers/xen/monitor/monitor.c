@@ -612,7 +612,7 @@ static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int dom
 		}
 	}
 	
-	printk(KERN_ALERT "%s,Unwatched process, ignoring",__FUNCTION__);
+	printk(KERN_ALERT "%s,Unwatched process modifying MFN #%lu, ignoring",__FUNCTION__,mmu_mfn);
 	return 0;
 
 }
