@@ -123,6 +123,7 @@ struct request_t {
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
+	unsigned int process_id;
 	int domid;
 	//uint64_t mmu_mfn;
 	unsigned long mmu_mfn;
@@ -134,6 +135,7 @@ struct response_t {
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
+	unsigned int process_id;
 	int domid;
 	//uint64_t mmu_ptr;
 	unsigned long mmu_ptr;
@@ -186,7 +188,7 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 static int monitor_register(monitor_share_info_t *info);
 //static int monitor_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
 //static int monitor_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
-static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int domid);
+static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int domid, unsigned int process_id);
 static void monitor_print_watched(void);
 /************************************************************************
 Grant table and Interdomain Functions
@@ -194,7 +196,8 @@ Grant table and Interdomain Functions
 static irqreturn_t monitor_irq_handle(int irq, void *dev_id);
 //static void cleanup_grant(void);
 static int monitor_report(process_report_t *rep);
-static int monitor_watch(process_report_t *rep);
+//static int monitor_watch(process_report_t *rep);
+static int monitor_watch(unsigned long arg);
 //static unsigned long monitor_unmap_range(unsigned long addr_start, int length, int blocksize);
 static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid);
 //static void monitor_dump_pages(unsigned long* mfnlist, unsigned int len);

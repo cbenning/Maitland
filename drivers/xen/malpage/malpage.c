@@ -149,44 +149,7 @@ static int malpage_init(void) {
 		printk(KERN_ALERT ">malpage_init: failed setting multi_mmu_update ptr.\n");	
 	}
 
-/*
-	printk(KERN_ALERT ">malpage_init: setting mmuext_op ptr.\n");
-	kmalpage_mmuext_op = &malpage_mmuext_op;
-	if(kmalpage_mmuext_op==NULL){
-		printk(KERN_ALERT ">malpage_init: failed setting mmuext_op ptr.\n");	
-	}
 
-	printk(KERN_ALERT ">malpage_init: setting multi_mmuext_op ptr.\n");
-	kmalpage_multi_mmuext_op = &malpage_multi_mmuext_op;
-	if(kmalpage_multi_mmuext_op==NULL){
-		printk(KERN_ALERT ">malpage_init: failed setting multi_mmuext_op ptr.\n");	
-	}
-
-	printk(KERN_ALERT ">malpage_init: setting update_descriptor ptr.\n");
-	kmalpage_update_descriptor = &malpage_update_descriptor;
-	if(kmalpage_update_descriptor==NULL){
-		printk(KERN_ALERT ">malpage_init: failed setting update_descriptor ptr.\n");	
-	}
-
-	printk(KERN_ALERT ">malpage_init: setting multi_update_descriptor ptr.\n");
-	kmalpage_multi_update_descriptor = &malpage_multi_update_descriptor;
-	if(kmalpage_multi_update_descriptor==NULL){
-		printk(KERN_ALERT ">malpage_init: failed setting update_descriptor ptr.\n");	
-	}
-
-
-	printk(KERN_ALERT ">malpage_init: setting update_va_mapping ptr.\n");
-	kmalpage_update_va_mapping = &malpage_update_va_mapping;
-	if(kmalpage_update_va_mapping==NULL){
-		printk(KERN_ALERT ">malpage_init: failed setting update_va_mapping ptr.\n");	
-	}
-
-	printk(KERN_ALERT ">malpage_init: setting multi_update_va_mapping ptr.\n");
-	kmalpage_multi_update_va_mapping= &malpage_multi_update_va_mapping;
-	if(kmalpage_multi_update_va_mapping==NULL){
-		printk(KERN_ALERT ">malpage_init: failed setting update_va_mapping ptr.\n");	
-	}
-*/
 	malpage_mmu_info_lock = SPIN_LOCK_UNLOCKED; //Initialize the lock
 	//malpage_share_info_set=1;
 	return 0;
@@ -289,7 +252,6 @@ MMU_PT_UPDATE_PRESERVE_AD:
 
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
 
-	pte_t tmp_pte;
 	struct request_t *ring_req;
 	int notify;
 	int i;
@@ -335,7 +297,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 				printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
 				tmp = req[i].ptr-cmd; //Ignore the last 4 bits
 				mfn = tmp >> PAGE_SHIFT;
-				
+
 				if(mfn){
 					printk(KERN_ALERT "--mfn: %lu\n",mfn);
 					
@@ -351,6 +313,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 					ring_req->mmu_mfn = mfn;	
 					ring_req->mmu_val = req[i].val;
 					ring_req->domid = malpage_share_info->domid;
+                    ring_req->process_id = tmp_pid;
 
 					// Send a reqest to backend followed by an int if needed
 					RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
@@ -366,7 +329,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 		//	default:
 		//		printk(KERN_ALERT "--type: UNKNOWN\n");
 			
-		}
+		//}
 
 	}
 
@@ -1750,13 +1713,15 @@ static int malpage_xs_watch(process_report_t *rep){
 	result = xenbus_mkdir(*xstrans, report_path, MALPAGE_XS_REPORT_FRAME_PATH);
 	pfn_str = kzalloc(strlen("18446744073709551615"),0);
 
-	for(i=0; i < rep->pfn_list_length; i ++){
+	/*
+    for(i=0; i < rep->pfn_list_length; i ++){
 
 		sprintf(pfn_str, "%lu",rep->pfn_list[i]);
 		//Signal report is finished
 		result = xenbus_write(*xstrans, report_frame_path, pfn_str, pfn_str);
 
 	}
+    */
 
 	//Write domid
 	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_DOMID_PATH, domid_str);
@@ -1844,11 +1809,10 @@ static int malpage_report(pid_t procID,malpage_share_info_t *info) {
 static int malpage_watch(pid_t procID,malpage_share_info_t *info) {
 
 	//gather report. notify monitor.
-
 	process_report_t *rep;
+
 	//int i;
 	struct task_struct *task;
-
 
 	for_each_process(task) {
 		if ( task->pid == procID) {
@@ -1857,21 +1821,17 @@ static int malpage_watch(pid_t procID,malpage_share_info_t *info) {
 	}
 
 	//Generate report
-	rep = malpage_generate_report(task);
+	//rep = malpage_generate_report(task);
+
+	rep->process_id = task->pid;
 	rep->domid = info->domid;
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "DomU: Watch Report Generated:\n");
 	printk(KERN_ALERT "	process_id: %u\n",rep->process_id);
 	printk(KERN_ALERT "	domid: %u\n",rep->domid);
-	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
-	printk(KERN_ALERT "	pfn_list:	");
 	#endif
 
-
-	#ifdef MALPAGE_DEBUG
-	//malpage_dump_file(rep);
-	#endif
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "Storing watch report in XS\n");

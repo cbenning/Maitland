@@ -156,6 +156,7 @@ struct request_t {
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
+	unsigned int process_id;
 	int domid;
 	//uint64_t mmu_mfn;
 	unsigned long mmu_mfn;
@@ -167,6 +168,7 @@ struct response_t {
 	unsigned int pfn_gref;
 	unsigned int pfn;
 	process_report_t report;
+	unsigned int process_id;
 	int domid;
 	//uint64_t mmu_ptr;
 	unsigned long mmu_ptr;

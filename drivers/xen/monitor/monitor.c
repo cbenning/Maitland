@@ -197,8 +197,8 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#ifdef MONITOR_DEBUG
 			printk(KERN_ALERT "Received watch report\n");
 			#endif
-			rep = monitor_populate_report(arg);
-			monitor_watch(rep);
+			//rep = monitor_populate_report(arg);
+			monitor_watch(arg);
 			return 0;
 		break;
 		case MONITOR_DEREGISTER:
@@ -440,8 +440,8 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 				case MONITOR_RING_MMUUPDATE:
 					
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
-						printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d", __FUNCTION__,req.mmu_mfn,req.mmu_val,req.domid);
-						monitor_check_mfnval(req.mmu_mfn,req.mmu_val,req.domid);
+						printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d:%u", __FUNCTION__,req.mmu_mfn,req.mmu_val,req.domid,req.process_id);
+						monitor_check_mmuupdate(req.mmu_mfn,req.mmu_val,req.domid,req.process_id);
 					}
 					break;
 				default:
@@ -515,14 +515,21 @@ static int monitor_report(process_report_t *rep) {
 }
 
 
-static int monitor_watch(process_report_t *rep){
+static int monitor_watch(unsigned long arg){
 
-	int i;
-	unsigned long **dom_cursor;
+	//int i;
+	unsigned long *dom_cursor;
 	unsigned long *proc_cursor;
+	process_report_t *rep, *tmp_rep;
+	//int failed = 0;
 
+	tmp_rep = (process_report_t*)arg;
+	rep = kzalloc(sizeof(process_report_t),GFP_KERNEL);
+	
+	rep->domid = tmp_rep->domid;
+	rep->process_id = tmp_rep->process_id;
+	rep->process_age = tmp_rep->process_age;
 	dom_cursor = NULL;
-	proc_cursor = NULL;
 
 	printk(KERN_ALERT "%s, setting watch for proc %d in Dom %d.",__FUNCTION__,rep->process_id,rep->domid);
 
@@ -532,18 +539,7 @@ static int monitor_watch(process_report_t *rep){
 		return -1;
 	}
 
-	proc_cursor = kzalloc(MONITOR_MAX_PFNS/8,GFP_KERNEL);
-	if(!bitmap_empty(proc_cursor,MONITOR_MAX_PFNS)){
-		printk(KERN_ALERT "%s, Unable to allocate bitmap for process, ignoring watch.",__FUNCTION__);
-		return -1;
-	}
-
-	for(i=0; i < rep->pfn_list_length; i++){
-		//printk(KERN_ALERT "%s, setting bit %d.",__FUNCTION__,rep->pfn_list[i]);
-		set_bit(rep->pfn_list[i],proc_cursor);
-	}
-
-	dom_cursor[rep->process_id] = proc_cursor;
+	dom_cursor[rep->process_id] = 1;
 	monitor_dom_list[rep->domid] = dom_cursor;
 
 	return 0;
@@ -584,7 +580,7 @@ static void monitor_print_watched(void){
 	}
 }
 
-static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int domid){
+static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int domid, unsigned int process_id){
 
 	int i;
 	unsigned long **dom_cursor;
@@ -603,12 +599,14 @@ static int monitor_check_mfnval(unsigned long mmu_mfn, uint64_t mmu_val, int dom
 
 	for(i=0; i < MONITOR_MAX_PROCS; i++){
 		proc_cursor = dom_cursor[i];
-		if(proc_cursor){
-			
-			if(test_bit(mmu_mfn,proc_cursor)){
+		if(*proc_cursor){
+
+			printk(KERN_ALERT "%s,Process #%d is attempting to change PTE",__FUNCTION__,i);
+			return 1;
+			/*if(test_bit(mmu_mfn,proc_cursor)){
 				printk(KERN_ALERT "%s,Process #%d is attempting to change PTE",__FUNCTION__,i);
 				return i;
-			}
+			}*/
 		}
 	}
 	
