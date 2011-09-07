@@ -156,7 +156,7 @@ typedef struct monitor_share_info_t {
 	domid_t domid;
 	grant_ref_t gref;
 	unsigned int evtchn;
-	//unsigned int irq;
+	unsigned int irq;
 	struct as_back_ring bring;
 } monitor_share_info_t;
 
@@ -171,6 +171,7 @@ static struct cdev monitor_cdev;
 static struct class* monitor_class;
 struct vm_struct** vm_struct_list;
 int vm_struct_list_size;
+
 
 /************************************************************************
 Grant table and Interdomain Variables
@@ -190,6 +191,8 @@ static int monitor_register(monitor_share_info_t *info);
 //static int monitor_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
 static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int domid, unsigned int process_id);
 static void monitor_print_watched(void);
+
+
 /************************************************************************
 Grant table and Interdomain Functions
 ************************************************************************/

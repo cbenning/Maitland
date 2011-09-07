@@ -373,7 +373,6 @@ static int monitor_register(monitor_share_info_t *info){
 		return -EFAULT;
 	}
 	
-	//info->irq = err;
 	info->evtchn = err;
 
 	#ifdef MONITOR_DEBUG
@@ -382,7 +381,6 @@ static int monitor_register(monitor_share_info_t *info){
 	
 	//Setup this domain with it's own list of processes
 	monitor_dom_list[info->domid] = kzalloc(sizeof(unsigned long*)*MONITOR_MAX_PROCS,GFP_KERNEL);
-
 
 	return 0;
 }
@@ -401,7 +399,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 		monitor_share_info_t *monitor_share_info;
 
 		#ifdef MONITOR_DEBUG
-		//printk(KERN_ALERT "Dom0: Handling Event\n");
+		printk(KERN_ALERT "Dom0: Handling Event\n");
 		#endif
 
 		monitor_share_info = (monitor_share_info_t*)dev_id;
@@ -454,10 +452,10 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 			monitor_share_info->bring.rsp_prod_pvt++;
 
 			RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&monitor_share_info->bring, notify);
-			
-			printk(KERN_ALERT "\nMonitor, Sending response\n");
-			//notify_remote_via_irq(monitor_share_info->irq);
 			notify_remote_via_irq(monitor_share_info->evtchn);
+			//RING_FINAL_CHECK_FOR_REQUESTS(&monitor_share_info->bring, notify);
+            			
+			printk(KERN_ALERT "Monitor, Sending response\n\n");
 
 		}
 
@@ -517,11 +515,9 @@ static int monitor_report(process_report_t *rep) {
 
 static int monitor_watch(unsigned long arg){
 
-	//int i;
-	unsigned long *dom_cursor;
-	unsigned long *proc_cursor;
+	unsigned long **dom_cursor;
+	unsigned long proc_cursor;
 	process_report_t *rep, *tmp_rep;
-	//int failed = 0;
 
 	tmp_rep = (process_report_t*)arg;
 	rep = kzalloc(sizeof(process_report_t),GFP_KERNEL);
@@ -542,6 +538,8 @@ static int monitor_watch(unsigned long arg){
 	dom_cursor[rep->process_id] = 1;
 	monitor_dom_list[rep->domid] = dom_cursor;
 
+    monitor_print_watched();
+
 	return 0;
 }
 
@@ -549,7 +547,7 @@ static void monitor_print_watched(void){
 
 	int i,j,k;
 	unsigned long **dom_cursor;
-	unsigned long *proc_cursor;
+	unsigned long proc_cursor;
 
 	printk(KERN_ALERT "%s,Dumping store...",__FUNCTION__);
 
@@ -566,25 +564,19 @@ static void monitor_print_watched(void){
 			proc_cursor = dom_cursor[j];
 			if(proc_cursor){
 
-				
-				printk(KERN_ALERT "------Process #%d",j);
+				printk(KERN_ALERT "----Process #%d",j);
 			
-				for(k=0;k<MONITOR_MAX_PFNS;k++){
-
-					if(test_bit(k,proc_cursor)){
-						printk(KERN_ALERT "-----------PFN #%d",k);
-					}
-				}
 			}
 		}
 	}
+    return;
 }
 
 static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int domid, unsigned int process_id){
 
-	int i;
+	unsigned int i;
 	unsigned long **dom_cursor;
-	unsigned long *proc_cursor;
+	unsigned long proc_cursor;
 
 	dom_cursor = monitor_dom_list[domid];
 	if(!dom_cursor){
@@ -599,14 +591,10 @@ static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int 
 
 	for(i=0; i < MONITOR_MAX_PROCS; i++){
 		proc_cursor = dom_cursor[i];
-		if(*proc_cursor){
+		if(proc_cursor && i==process_id){
 
-			printk(KERN_ALERT "%s,Process #%d is attempting to change PTE",__FUNCTION__,i);
+			printk(KERN_ALERT "%s,Watched Process #%d in Dom:%u is attempting to change PTE",__FUNCTION__,i,domid);
 			return 1;
-			/*if(test_bit(mmu_mfn,proc_cursor)){
-				printk(KERN_ALERT "%s,Process #%d is attempting to change PTE",__FUNCTION__,i);
-				return i;
-			}*/
 		}
 	}
 	

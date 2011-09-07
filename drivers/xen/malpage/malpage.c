@@ -246,9 +246,7 @@ MMU_PT_UPDATE_PRESERVE_AD:
 	updates of pagetable entries, while atomically preserving the current 
 	status of accessed and dirty bits in each entry. 
   
-
 */
-
 
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
 
@@ -267,7 +265,6 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 	if(count<1 && malpage_share_info){
 		return 0;
 	}
-
 	spin_lock(&malpage_mmu_info_lock);
 
 	for(i=0; i < count; i++){
@@ -285,56 +282,59 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 		printk(KERN_ALERT "CMD: %lx\n",(unsigned long)cmd);
 		printk(KERN_ALERT "VAL: %llu\n",req[i].val);
 
-        tmp_pid = current_thread_info()->task->pid;
-        printk(KERN_ALERT "PID: %lu\n",(unsigned long)tmp_pid);
-
-
-        
 		//switch(cmd){
 		//	case MMU_NORMAL_PT_UPDATE:
 		//	case MMU_PT_UPDATE_PRESERVE_AD:
 
-				printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
+                tmp_pid = current_thread_info()->task->pid;
+                printk(KERN_ALERT "PID: %lu\n",(unsigned long)tmp_pid);
+
+				//printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
 				tmp = req[i].ptr-cmd; //Ignore the last 4 bits
 				mfn = tmp >> PAGE_SHIFT;
 
-				if(mfn){
+                if(mfn){
+
 					printk(KERN_ALERT "--mfn: %lu\n",mfn);
 					
 					//tmp_pte = mfn_pte(mfn,PAGE_KERNEL);
 					tmp_page = pfn_to_page(mfn_to_pfn(mfn));
 					printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
-					
-					// Write a request into the ring and update the req-prod pointer
-					ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
-					ring_req->operation = MALPAGE_RING_MMUUPDATE;
-					malpage_share_info->fring.req_prod_pvt += 1;
-
-					ring_req->mmu_mfn = mfn;	
-					ring_req->mmu_val = req[i].val;
-					ring_req->domid = malpage_share_info->domid;
-                    ring_req->process_id = tmp_pid;
-
-					// Send a reqest to backend followed by an int if needed
-					RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify);
-					notify_remote_via_irq(malpage_share_info->irq);
-				    	
-					printk(KERN_ALERT "\nI just sent a notification to Dom0\n");
 				}
+
+                // Write a request into the ring and update the req-prod pointer
+                ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
+                ring_req->operation = MALPAGE_RING_MMUUPDATE;
+                malpage_share_info->fring.req_prod_pvt += 1;
+
+                //ring_req->mmu_mfn = mfn;	
+                ring_req->mmu_mfn = 1;//FIXME
+                ring_req->mmu_val = req[i].val;
+                ring_req->domid = malpage_share_info->domid;
+                ring_req->process_id = tmp_pid;
+
+                // Send a reqest to backend followed by an int if needed
+                //RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify); 
+                RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
+                notify_remote_via_irq(malpage_share_info->irq);
+                    
+                printk(KERN_ALERT "I just sent a notification to Dom0\n");
+            
 				
-		//	break;		
-		//	case MMU_MACHPHYS_UPDATE:
-		//		printk(KERN_ALERT "--type: MMU_MACHPHYS_UPDATE\n");
-    	//	break;
-		//	default:
-		//		printk(KERN_ALERT "--type: UNKNOWN\n");
+			//break;		
+			//case MMU_MACHPHYS_UPDATE:
+				//printk(KERN_ALERT "--type: MMU_MACHPHYS_UPDATE\n");
+    		//break;
+			//default:
+			//	printk(KERN_ALERT "--type: UNKNOWN\n");
 			
 		//}
 
 	}
 
 	spin_unlock(&malpage_mmu_info_lock);
-
+	RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
+	printk(KERN_ALERT "Done\n");
 
 	return 0;
 }
@@ -1820,11 +1820,12 @@ static int malpage_watch(pid_t procID,malpage_share_info_t *info) {
 		}
 	}
 
-	//Generate report
-	//rep = malpage_generate_report(task);
+	//Get empty report
+    rep = kmalloc(sizeof(process_report_t),0);
 
 	rep->process_id = task->pid;
 	rep->domid = info->domid;
+
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "DomU: Watch Report Generated:\n");

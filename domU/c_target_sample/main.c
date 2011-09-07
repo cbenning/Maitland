@@ -36,7 +36,7 @@ int main( int argc, const char* argv[] ){
 		//memcpy(&(empty_var[i*NUMPAGES]),&tmp, sizeof(tmp));
 	}
 
-	for(i=0; i <= 15; i++){
+	for(i=0; i <= 10; i++){
 		printf("%d: Sleeping for %d...\n",pid,i);
 		sleep(1);
 	}
