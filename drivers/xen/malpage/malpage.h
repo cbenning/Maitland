@@ -200,6 +200,11 @@ static struct cdev malpage_cdev;
 static struct class* malpage_class;
 process_report_node_t *report_list;
 
+static struct semaphore* report_sem;
+static pid_t report_pid;
+static int report_running = 1;
+static struct task_struct* reporter;
+
 /************************************************************************
 Grant table and Interdomain Variables
 ************************************************************************/
@@ -213,6 +218,7 @@ Interface and Util Functions
 
 static int malpage_init(void);
 static void malpage_exit(void);
+static int malpage_report_thread(void* args);
 static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
 static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);

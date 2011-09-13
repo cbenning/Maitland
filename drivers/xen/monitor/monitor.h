@@ -96,13 +96,18 @@ Module Interface and Util Structs
 ************************************************************************/
 typedef struct process_report_t{
 	unsigned int process_id;
-	//domid_t domid;
 	unsigned int domid;
 	unsigned int process_age;
 	unsigned long *pfn_list;
 	unsigned int *gref_list;
 	unsigned int pfn_list_length;
 }process_report_t;
+
+typedef struct process_watchreport_t{
+	unsigned int process_id;
+	unsigned int domid;
+	unsigned int process_age;
+}process_watchreport_t;
 
 typedef struct gref_list_t{
 	unsigned int gref_list[MONITOR_GREF_PAGE_COUNT]; //Fill up te page, leave room for last gref;

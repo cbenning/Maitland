@@ -232,17 +232,17 @@ def watch_domain_watchreport(path, xs):
         reg_path=path.rsplit("/",1)[0]
         print "WatchReport found at:"+reg_path
         
-        th = xs.transaction_start()    
-        dirs = xs.ls(th, reg_path+MONITOR_XS_WATCHREPORT_FRAME_PATH)
-        xs.transaction_end(th)
+        #th = xs.transaction_start()    
+        #dirs = xs.ls(th, reg_path+MONITOR_XS_WATCHREPORT_FRAME_PATH)
+        #xs.transaction_end(th)
         
-        frames = []
-        count = 0
+        #frames = []
+        #count = 0
         
         th = xs.transaction_start()    
-        for dir in dirs:
-            frames.append(int(dir))
-            count += 1
+        #for dir in dirs:
+        #    frames.append(int(dir))
+        #    count += 1
         
         domid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_DOMID_PATH))
         pid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_PID_PATH))
@@ -250,24 +250,23 @@ def watch_domain_watchreport(path, xs):
         xs.transaction_end(th)
         
         
-        print "Received "+str(count)+" pfns, now removing watchreport"
+        #print "Received "+str(count)+" pfns, now removing watchreport"
         
         
         #Nuke the report 
         th = xs.transaction_start()    
-        #xs.rm(th, reg_path)
+        xs.rm(th, reg_path)
         xs.transaction_end(th)    
         
         print "Sending watch report to Monitor module..."       
         
         #print frames 
-              
-        pfnArr = array.array('L',frames)
-        
-        print "pfnsize"+str(pfnArr.itemsize)
+        #pfnArr = array.array('L',frames)
+        #print "pfnsize"+str(pfnArr.itemsize)
         
         ops = Monitor(MONITOR_DEVICE)
-        procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],pfnArr.buffer_info()[0],count)
+        #procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],pfnArr.buffer_info()[0],count)
+        procStruct = struct.pack("III",pid,domid,0,)
         ops.doMonitorOp(MONITOR_WATCH, procStruct)
         ops.close()
         
@@ -330,8 +329,6 @@ def dump():
 
 def main():
 
-
-    
     xs = xshandle()
 
     if len(sys.argv) > 1 and sys.argv[1]=='clean':

@@ -380,7 +380,7 @@ static int monitor_register(monitor_share_info_t *info){
 	#endif
 	
 	//Setup this domain with it's own list of processes
-	monitor_dom_list[info->domid] = kzalloc(sizeof(unsigned long*)*MONITOR_MAX_PROCS,GFP_KERNEL);
+	monitor_dom_list[info->domid] = kzalloc(sizeof(unsigned long)*MONITOR_MAX_PROCS,GFP_KERNEL);
 
 	return 0;
 }
@@ -439,7 +439,13 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 						printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d:%u", __FUNCTION__,req.mmu_mfn,req.mmu_val,req.domid,req.process_id);
-						monitor_check_mmuupdate(req.mmu_mfn,req.mmu_val,req.domid,req.process_id);
+
+                        //If the process is one we are watching
+						if(monitor_check_mmuupdate(req.mmu_mfn,req.mmu_val,req.domid,req.process_id)>0){
+                            //Re
+                            resp.process_id = req.process_id;
+                            resp.operation = MONITOR_RING_REPORT;
+                        }
 					}
 					break;
 				default:
@@ -504,10 +510,10 @@ static int monitor_report(process_report_t *rep) {
 	//Unmap RANGE
 
 	//Kill process
-	//return MONITOR_RING_KILL;
+	return MONITOR_RING_KILL;
 
 	//Dont Kill process
-	return MONITOR_RING_RESUME;
+	//return MONITOR_RING_RESUME;
 
 
 }
@@ -520,7 +526,7 @@ static int monitor_watch(unsigned long arg){
 	process_report_t *rep, *tmp_rep;
 
 	tmp_rep = (process_report_t*)arg;
-	rep = kzalloc(sizeof(process_report_t),GFP_KERNEL);
+	rep = kzalloc(sizeof(process_watchreport_t),GFP_KERNEL);
 	
 	rep->domid = tmp_rep->domid;
 	rep->process_id = tmp_rep->process_id;
@@ -580,7 +586,7 @@ static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int 
 
 	dom_cursor = monitor_dom_list[domid];
 	if(!dom_cursor){
-		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,domid);
+		//printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,domid);
 		return -1;
 	}		
 
@@ -598,7 +604,7 @@ static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int 
 		}
 	}
 	
-	printk(KERN_ALERT "%s,Unwatched process modifying MFN #%lu, ignoring",__FUNCTION__,mmu_mfn);
+	//printk(KERN_ALERT "%s,Unwatched process modifying MFN #%lu, ignoring",__FUNCTION__,mmu_mfn);
 	return 0;
 
 }

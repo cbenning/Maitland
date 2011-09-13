@@ -622,6 +622,7 @@ deps_/home/chris/workspace/malware_trunk/drivers/xen/malpage/malpage.o := \
     $(wildcard include/config/profiling.h) \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/sections.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/asm-generic/sections.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/linux/kthread.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/io.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/include/xen/xen.h \
     $(wildcard include/config/xen/dom0.h) \
