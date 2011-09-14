@@ -113,26 +113,24 @@ def watch_domain_register(path, xs):
         xswatch(watch_path, watch_domain_down, xs)
         
         #set perms of new directory: set_permissions takes a list of three tuples
-        #watch_path = MONITOR_XS_REPORT_PATH+"/"+str(values[0])
-        watch_path = MONITOR_XS_WATCHREPORT_PATH+"/"+str(values[0])
-        
+        watch_path = MONITOR_XS_REPORT_PATH+"/"+str(values[0])
+        watchreport_path = MONITOR_XS_WATCHREPORT_PATH+"/"+str(values[0])
 
         th = xs.transaction_start()    
         perm_tuple = { "dom":int(values[0]), "read":True , "write":True }
         xs.mkdir(th,watch_path)
         xs.set_permissions(th,watch_path, [perm_tuple,perm_tuple,perm_tuple])
-        
+        xs.mkdir(th,watchreport_path)
+        xs.set_permissions(th,watchreport_path, [perm_tuple,perm_tuple,perm_tuple])       
         xs.transaction_end(th)
         
-        #print "Watching path for report: "+watch_path
-        #xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_report, xs)
+        print "Watching path for report: "+watch_path
+        xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_report, xs)
         print "Watching path for watch_report: "+watch_path
-        xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_watchreport, xs)
-        
+        xswatch(watchreport_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_watchreport, xs)
 
         print "Domain "+str(value)+" registered"
 
-        
         #remove the watch
         return False
         
@@ -177,8 +175,9 @@ def watch_domain_report(path, xs):
         
         #Nuke the report 
         th = xs.transaction_start()    
-        #xs.rm(th, reg_path)
+        xs.rm(th, reg_path)
         xs.transaction_end(th)    
+       
         
         print "Sending report to Monitor module..."       
         
@@ -191,13 +190,12 @@ def watch_domain_report(path, xs):
         print "pfnsize"+str(pfnArr.itemsize)
         
         ops = Monitor(MONITOR_DEVICE)
+        print "Sending args"
         procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],grefArr.buffer_info()[0],count)
         ops.doMonitorOp(MONITOR_REPORT, procStruct)
         ops.close()
         
-        print "Reported"     
-        
-        '''print "Dumping memory"
+        print "Dumping memory"
         f1 = open(MONITOR_DEVICE,"rb")
         filename = MONITOR_DUMP_DIR+""+str(pid)+"_dump.bin"
         f2 = open(filename,"wb")
@@ -212,7 +210,7 @@ def watch_domain_report(path, xs):
         
         f1.close()
         f2.close()
-        '''
+        
         
         #remove watch
         return False

@@ -156,11 +156,15 @@ static int malpage_init(void) {
     //Report Semaphore for sleeper thread
     report_sem = kzalloc(sizeof(struct semaphore),0);
     sema_init(report_sem,0);
+    process_op_sem = kzalloc(sizeof(struct semaphore),0);
+    sema_init(process_op_sem,0);
 
-    
     reporter = kthread_create(malpage_report_thread,NULL,"reporter");
+    process_oper = kthread_create(malpage_process_op_thread,NULL,"oper");
     wake_up_process(reporter);
 	printk(KERN_ALERT ">malpage_init: Spawning report thread\n");
+    wake_up_process(process_oper);
+	printk(KERN_ALERT ">malpage_init: Spawning process op thread\n");
 
 	return 0;
 }
@@ -193,14 +197,26 @@ static int malpage_report_thread(void* args){
 
     printk(KERN_ALERT "report thread spawned");
     while(report_running){
-        printk(KERN_ALERT "GOT0.1");
-        down(report_sem);
-        printk(KERN_ALERT "GOT0.2");
+        down(report_sem); //Wait until I am notified and should go again
         malpage_report(report_pid,malpage_share_info);
-        printk(KERN_ALERT "GOT0.3");
     }
     return 0;
 }
+
+
+static int malpage_process_op_thread(void* args){
+
+    printk(KERN_ALERT "process op thread spawned");
+    while(process_op_running){
+		printk(KERN_ALERT  "\nGOT4\n");
+        down(process_op_sem); //Wait until I am notified and should go again
+		printk(KERN_ALERT  "\nGOT5\n");
+        malpage_op_process(process_op_op,process_op_pid);
+    }
+    return 0;
+}
+
+
 
 
 static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid){
@@ -320,11 +336,11 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 
                 if(mfn){
 
-					printk(KERN_ALERT "--mfn: %lu\n",mfn);
+					//printk(KERN_ALERT "--mfn: %lu\n",mfn);
 					
 					//tmp_pte = mfn_pte(mfn,PAGE_KERNEL);
 					tmp_page = pfn_to_page(mfn_to_pfn(mfn));
-					printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
+					//printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
 				}
 
                 // Write a request into the ring and update the req-prod pointer
@@ -343,8 +359,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
                 RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
                 notify_remote_via_irq(malpage_share_info->irq);
                     
-                printk(KERN_ALERT "I just sent a notification to Dom0\n");
-            
+                //printk(KERN_ALERT "I just sent a notification to Dom0\n");
 				
 			//break;		
 			//case MMU_MACHPHYS_UPDATE:
@@ -359,7 +374,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 
 	RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
 	spin_unlock(&malpage_mmu_info_lock);
-	printk(KERN_ALERT "Done\n");
+	//printk(KERN_ALERT "Done\n");
 
 	return 0;
 }
@@ -1912,9 +1927,10 @@ static int malpage_op_process(unsigned int op, unsigned int pid){
 
 	struct task_struct *task;
 
+    task == NULL;
 	//Get task_struct for given pid
 	for_each_process(task) {
-		if ( task->pid == pid) {
+		if ( task->pid == (pid_t)pid) {
 			break;
 		}
 	}
@@ -1979,7 +1995,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 	struct task_struct *task;
 
 	#ifdef MALPAGE_DEBUG	
-	printk(KERN_ALERT "DomU: Handling Event\n");
+	//printk(KERN_ALERT "DomU: Handling Event\n");
 	#endif
 
 	again:
@@ -1998,55 +2014,37 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 					break;
 
 				case MALPAGE_RING_KILL:
-					printk(KERN_ALERT  "\nMalpage, Got KILLOP: %d\n", resp->operation);
-					malpage_op_process(MALPAGE_RING_KILL,(resp->report).process_id);
-					//TODO: UNMAP Process memory
+					printk(KERN_ALERT  "\nMalpage, Got KILLOP: %d,%d\n", resp->operation, resp->process_id);
+                    process_op_pid = resp->process_id;
+                    process_op_op = MALPAGE_RING_KILL;
+                    up(process_op_sem);
 					break;
 
 				case MALPAGE_RING_RESUME:
-					printk(KERN_ALERT  "\nMalpage, Got RESUMEOP: %d\n", resp->operation);
-					malpage_op_process(MALPAGE_RING_RESUME,(resp->report).process_id);
+					printk(KERN_ALERT  "\nMalpage, Got RESUMEOP: %d,%d\n", resp->operation, resp->process_id);
+                    process_op_pid = resp->process_id;
+                    process_op_op = MALPAGE_RING_RESUME;
+                    up(process_op_sem);
 					break;
-					//TODO: UNMAP Process memory
 
 				case MALPAGE_RING_HALT:
-					printk(KERN_ALERT  "\nMalpage, Got PAUSEOP: %d\n", resp->operation);
-					malpage_op_process(MALPAGE_RING_HALT,(resp->report).process_id);
+					printk(KERN_ALERT  "\nMalpage, Got PAUSEOP: %d,%d\n", resp->operation, resp->process_id);
+                    process_op_pid = resp->process_id;
+                    process_op_op = MALPAGE_RING_HALT;
+                    up(process_op_sem);
 					break;
 
                 case MALPAGE_RING_REPORT:
 					printk(KERN_ALERT  "\nMalpage, Got REPORTOP: %d\n", resp->operation);
 
-					//malpage_op_process(MALPAGE_RING_HALT,resp->process_id);
-
                     #ifdef MALPAGE_DEBUG
                     printk(KERN_ALERT "Reporting %ul\n",resp->process_id);
                     #endif
-
-                    /*
-                    for_each_process(task) {
-                        if ( task->pid == resp->process_id) {
-                            break;
-                        }
-                    }
-
-                    set_task_state(task,TASK_STOPPED);
-                    // -1 unrunnable, 0 runnable, >0 stopped 
-                    // Wait for it to stop
-
-                    while(task->state != TASK_STOPPED){
-                        printk(KERN_ALERT "GOT3.0");
-                        //msleep(100);    
-                    }*/
-
-                    printk(KERN_ALERT "GOT3.1");
                     
                     report_pid = (pid_t)resp->process_id;
-                    up(report_sem);
+                    up(report_sem); //Notify reporter thread
 
-                    //malpage_report((pid_t)resp->process_id,malpage_share_info);
 
-                    printk(KERN_ALERT "GOT3.3");
 					break;
 
 				default:

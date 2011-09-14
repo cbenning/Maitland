@@ -399,7 +399,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 		monitor_share_info_t *monitor_share_info;
 
 		#ifdef MONITOR_DEBUG
-		printk(KERN_ALERT "Dom0: Handling Event\n");
+		//printk(KERN_ALERT "Dom0: Handling Event\n");
 		#endif
 
 		monitor_share_info = (monitor_share_info_t*)dev_id;
@@ -428,23 +428,19 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 				
 					printk(KERN_ALERT "\nMonitor, Got MONITOR_RING_REPORT op: %u", req.operation);
 
-					//resp.operation = MONITOR_RING_QUERY_PFNLIST;
 					resp.operation = monitor_report(&(req.report));
-					//more_to_do = 1;
 					resp.report = req.report;
-					//return IRQ_HANDLED;
 					break;
 
 				case MONITOR_RING_MMUUPDATE:
 					
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
-						printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d:%u", __FUNCTION__,req.mmu_mfn,req.mmu_val,req.domid,req.process_id);
 
                         //If the process is one we are watching
 						if(monitor_check_mmuupdate(req.mmu_mfn,req.mmu_val,req.domid,req.process_id)>0){
-                            //Re
+						    printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d:%u", __FUNCTION__,req.mmu_mfn,req.mmu_val,req.domid,req.process_id);
                             resp.process_id = req.process_id;
-                            resp.operation = MONITOR_RING_REPORT;
+                            resp.operation = MONITOR_RING_REPORT; //request report
                         }
 					}
 					break;
@@ -461,7 +457,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 			notify_remote_via_irq(monitor_share_info->evtchn);
 			//RING_FINAL_CHECK_FOR_REQUESTS(&monitor_share_info->bring, notify);
             			
-			printk(KERN_ALERT "Monitor, Sending response\n\n");
+			//printk(KERN_ALERT "Monitor, Sending response\n\n");
 
 		}
 
@@ -510,12 +506,13 @@ static int monitor_report(process_report_t *rep) {
 	//Unmap RANGE
 
 	//Kill process
-	return MONITOR_RING_KILL;
+	//return MONITOR_RING_KILL;
+    monitor_kill_process(rep->process_id);
 
 	//Dont Kill process
 	//return MONITOR_RING_RESUME;
 
-
+    return 0;
 }
 
 
@@ -765,7 +762,47 @@ static ssize_t monitor_read(struct file *filp, char *buffer, size_t count, loff_
 
 }
 
+static int monitor_op_process(unsigned int op, unsigned int pid){
 
+    int notify;
+    struct response_t resp;
+    resp.operation = op;
+    resp.process_id = pid;
+
+    memcpy(RING_GET_RESPONSE(&monitor_share_info->bring, monitor_share_info->bring.rsp_prod_pvt), &resp, sizeof(resp));
+    monitor_share_info->bring.rsp_prod_pvt++;
+    RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&monitor_share_info->bring, notify);
+    notify_remote_via_irq(monitor_share_info->evtchn);
+    
+    /*
+    ring_req = RING_GET_REQUEST(&(monitor_share_info->bring), monitor_share_info->bring.rsp_prod_pvt);
+    ring_req->operation = op;
+    ring_req->process_id = pid;
+    RING_PUSH_REQUESTS(&(monitor_share_info->bring)); 
+    notify_remote_via_irq(monitor_share_info->irq);
+    */
+}
+
+
+static void monitor_halt_process(unsigned int pid) {
+	//stop it
+	monitor_op_process(MONITOR_RING_HALT, pid);
+	return;
+}
+
+
+static void monitor_resume_process(unsigned int pid) {
+	//start it
+	monitor_op_process(MONITOR_RING_RESUME, pid);
+	return;
+}
+
+
+static void monitor_kill_process(unsigned int pid) {
+	//kill it
+	monitor_op_process(MONITOR_RING_KILL, pid);
+	return;
+}
 
 
 module_init( monitor_init);

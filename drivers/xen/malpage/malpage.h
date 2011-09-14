@@ -205,6 +205,14 @@ static pid_t report_pid;
 static int report_running = 1;
 static struct task_struct* reporter;
 
+static struct semaphore* process_op_sem;
+static unsigned int process_op_pid;
+static unsigned int process_op_op;
+static int process_op_running = 1;
+static struct task_struct* process_oper;
+
+
+
 /************************************************************************
 Grant table and Interdomain Variables
 ************************************************************************/
@@ -219,6 +227,7 @@ Interface and Util Functions
 static int malpage_init(void);
 static void malpage_exit(void);
 static int malpage_report_thread(void* args);
+static int malpage_process_op_thread(void* args);
 static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
 static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
