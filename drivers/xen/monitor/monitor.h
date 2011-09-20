@@ -68,6 +68,7 @@
 #define MONITOR_RING_RESUME 4
 #define MONITOR_RING_HALT 5
 #define MONITOR_RING_MMUUPDATE 6
+#define MONITOR_RING_NX 7
 
 //Storage constants
 #define MONITOR_GREF_PAGE_COUNT (PAGE_SIZE/sizeof(unsigned int))-1
@@ -90,6 +91,7 @@
 #define MONITOR_MAX_PFNS max_pfn
 //#define MONITOR_MAX_PFNS ULONG_MAX
 
+#define MONITOR_64_MMUPTR_TYPE_MASK 7ul //For ignoring the last 4 bits
 
 /************************************************************************
 Module Interface and Util Structs
@@ -131,7 +133,7 @@ struct request_t {
 	unsigned int process_id;
 	int domid;
 	//uint64_t mmu_mfn;
-	unsigned long mmu_mfn;
+	unsigned long mmu_ptr;
 	uint64_t mmu_val;
 };
 

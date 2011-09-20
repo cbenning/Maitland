@@ -3,6 +3,8 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <unistd.h>
+#include <time.h>
 #define NUMPAGES 300
 #define PAGESIZE 4096
 #define MEMSIZE PAGESIZE*NUMPAGES
@@ -12,30 +14,29 @@ int main( int argc, const char* argv[] ){
 
 	char *empty_var;
 	int i;
-	int j;
 	pid_t pid;
 	char buf[100];
-	empty_var = calloc(NUMPAGES,PAGESIZE);
-	//printf("\npagesize %d\n",PAGESIZE);
 	int tmp;
 	extern int errno;  
 	void* pg_aligned;
 
+	empty_var = calloc(NUMPAGES,PAGESIZE);
+
 	if((pid = getpid()) <0){
 		perror("Unable to determine my PID");
-		return 0;
+		return -1;
 	}
 
 	for(i=0; i < NUMPAGES; i++){
 
 		tmp = i*i;
-		sprintf(buf,"This is a test:%d\n",time());
+		sprintf(buf,"This is a test:%d\n",(int)time(NULL));
 		strcpy(empty_var+i*PAGESIZE,buf);
 
 		//printf("Wrote %s to page %d\n",buf, i);
 		//memcpy(&(empty_var[i*NUMPAGES]),&tmp, sizeof(tmp));
 	}
-
+    
 	for(i=0; i <= 10; i++){
 		printf("%d: Sleeping for %d...\n",pid,i);
 		sleep(1);

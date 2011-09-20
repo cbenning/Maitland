@@ -85,6 +85,7 @@
 #define MALPAGE_RING_RESUME 4
 #define MALPAGE_RING_HALT 5
 #define MALPAGE_RING_MMUUPDATE 6
+#define MALPAGE_RING_NX 7
 
 //Storage constants
 #define MALPAGE_GREF_PAGE_COUNT (PAGE_SIZE/sizeof(unsigned int))-1
@@ -159,7 +160,7 @@ struct request_t {
 	unsigned int process_id;
 	int domid;
 	//uint64_t mmu_mfn;
-	unsigned long mmu_mfn;
+	unsigned long mmu_ptr;
 	uint64_t mmu_val;
 };
 
@@ -249,7 +250,7 @@ static int malpage_op_process(unsigned int op, unsigned int pid);
 static void malpage_halt_process(struct task_struct *task);
 static void malpage_resume_process(struct task_struct *task);
 static void malpage_kill_process(struct task_struct *task);
-
+static int malpage_flipnx_page(unsigned long mmu_mfn);
 
 /************************************************************************
 Grant table and Interdomain Functions

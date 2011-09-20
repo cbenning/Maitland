@@ -437,10 +437,17 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 
                         //If the process is one we are watching
-						if(monitor_check_mmuupdate(req.mmu_mfn,req.mmu_val,req.domid,req.process_id)>0){
-						    printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d:%u", __FUNCTION__,req.mmu_mfn,req.mmu_val,req.domid,req.process_id);
+						if(monitor_check_mmuupdate(req.mmu_ptr,req.mmu_val,req.domid,req.process_id)>0){
+                            
+                            printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d:%u", __FUNCTION__,req.mmu_ptr,req.mmu_val,req.domid,req.process_id);
                             resp.process_id = req.process_id;
-                            resp.operation = MONITOR_RING_REPORT; //request report
+                            resp.domid = req.domid;
+                            resp.mmu_ptr = req.mmu_ptr;
+                            resp.mmu_val = req.mmu_val;
+                            resp.operation = MONITOR_RING_NX; //request mark NX
+                            printk(KERN_ALERT "%s: Request mark page Non-Exec", __FUNCTION__);
+
+                            //resp.operation = MONITOR_RING_REPORT; //request report
                         }
 					}
 					break;
@@ -781,6 +788,8 @@ static int monitor_op_process(unsigned int op, unsigned int pid){
     RING_PUSH_REQUESTS(&(monitor_share_info->bring)); 
     notify_remote_via_irq(monitor_share_info->irq);
     */
+
+    return 0;
 }
 
 
