@@ -2101,8 +2101,9 @@ static int malpage_flipnx_page(unsigned long mmu_mfn){
     cmd = mptr & (MALPAGE_64_MMUPTR_TYPE_MASK);	
     mptr -= cmd; //Ignore the last 4 bits
     ptr = __va(mptr);
-    test_and_set_bit(63,(unsigned long*)ptr); //FIXME, Hardcoded
     printk(KERN_ALERT "Marking as Non-Exec\n");
+    test_and_set_bit(63,(unsigned long*)ptr); //FIXME, Hardcoded
+    printk(KERN_ALERT "Marked as Non-Exec\n");
 
     return test_bit(63,(unsigned long*)ptr);
     

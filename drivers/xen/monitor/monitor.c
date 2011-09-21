@@ -548,7 +548,7 @@ static int monitor_watch(unsigned long arg){
 	dom_cursor[rep->process_id] = 1;
 	monitor_dom_list[rep->domid] = dom_cursor;
 
-    monitor_print_watched();
+    //monitor_print_watched();
 
 	return 0;
 }
@@ -590,9 +590,13 @@ static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int 
 
 	dom_cursor = monitor_dom_list[domid];
 	if(!dom_cursor){
-		//printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,domid);
+		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring watch.",__FUNCTION__,domid);
 		return -1;
 	}		
+
+
+    printk(KERN_ALERT "%s,Watched Dom:%u is attempting to change PTE",__FUNCTION__,domid);
+    return 1;
 
 	if(mmu_mfn==0){
 		printk(KERN_ALERT "%s, A process in Dom:%u is attempting to add an entry.",__FUNCTION__,domid);
