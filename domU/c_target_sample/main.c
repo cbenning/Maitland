@@ -57,7 +57,7 @@ int main( int argc, const char* argv[] ){
 
 
 	while(1){
-		sleep(0.1);
+		sleep(1.0);
 	}
 
 }

@@ -961,6 +961,9 @@ static int fault_in_kernel_space(unsigned long address)
  * and the problem, and then passes it off to one of the appropriate
  * routines.
  */
+//MALPAGE
+extern int (*kmalpage_do_page_fault)(struct task_struct *task, unsigned long address, unsigned long error_code);
+
 dotraplinkage void __kprobes
 do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
@@ -984,6 +987,11 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (kmemcheck_active(regs))
 		kmemcheck_hide(regs);
 	prefetchw(&mm->mmap_sem);
+
+	//MALPAGE
+	if(kmalpage_do_page_fault!=NULL){
+		kmalpage_do_page_fault(tsk,address,error_code);
+	}
 
 	if (unlikely(kmmio_fault(regs, address)))
 		return;

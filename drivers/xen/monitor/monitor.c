@@ -594,9 +594,8 @@ static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int 
 		return -1;
 	}		
 
-
-    printk(KERN_ALERT "%s,Watched Dom:%u is attempting to change PTE",__FUNCTION__,domid);
-    return 1;
+    //printk(KERN_ALERT "%s,Watched Dom:%u is attempting to change PTE",__FUNCTION__,domid);
+    //return 1;
 
 	if(mmu_mfn==0){
 		printk(KERN_ALERT "%s, A process in Dom:%u is attempting to add an entry.",__FUNCTION__,domid);

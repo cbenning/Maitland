@@ -19,32 +19,37 @@ int main( int argc, char* argv[] ){
     int status;
 
 	if(argc < 2){
-		printf("Not enough params\n");
-		exit(-1);
+		printf("Not enough parameters\n");
+		return -1;
 	}
 
-    command = argv[0];
+    command = argv[1];
 
    	file_desc = open(DEVICE_FILE_NAME,O_RDWR);
 	if (file_desc < 0) {
-		printf("Can't open device file: %s\n", DEVICE_FILE_NAME);
-		exit(-1);
+		printf("Can't open device file\n");
+		return -1;
 	}
 
 	//Attempt to fork
 	if((pid = fork()) < 0){
 		printf("Unable to create child process, exiting.\n");
-		exit(-1);
+		return -1;
 	}
 	//If fork was successful
 	else{
 		//If current thread is the child
 		if (pid == 0){
 
+            if((pid = getpid()) <0){
+                printf("Unable to determine my PID");
+                return -1;
+            }
+
             //run watch
 			ret_val = ioctl(file_desc, MALPAGE_WATCH, pid);
 			if (ret_val < 0) {
-				printf("ioctl_msg MALPAGE_WATCH failed:%d\n", ret_val);
+				printf("ioctl_msg MALPAGE_WATCH failed\n");
 			}
 
             //run the program
@@ -54,7 +59,7 @@ int main( int argc, char* argv[] ){
 				printf("%s\n",strerror(errno));
 			}
 
-			exit(0);
+		    return 0;
 		}
 		//If current thread is the parent
 		else{

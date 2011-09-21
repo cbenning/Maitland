@@ -151,6 +151,12 @@ static int malpage_init(void) {
 		printk(KERN_ALERT ">malpage_init: failed setting multi_mmu_update ptr.\n");	
 	}
 
+	printk(KERN_ALERT ">malpage_init: setting do_page_fault ptr.\n");
+	kmalpage_do_page_fault = &malpage_do_page_fault;
+	if(kmalpage_do_page_fault==NULL){
+		printk(KERN_ALERT ">malpage_init: failed setting do_page_fault ptr.\n");	
+	}
+
 	malpage_mmu_info_lock = SPIN_LOCK_UNLOCKED; //Initialize the lock
 
     //Report Semaphore for sleeper thread
@@ -381,7 +387,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
                 RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
                 notify_remote_via_irq(malpage_share_info->irq);
                     
-                //printk(KERN_ALERT "I just sent a notification to Dom0\n");
+                printk(KERN_ALERT "I just sent a notification to Dom0\n");
                         
             }
 
@@ -450,6 +456,17 @@ static int malpage_multi_update_va_mapping(struct multicall_entry *mcl, unsigned
 	}
 	return 0;
 }
+
+
+static int malpage_do_page_fault(struct task_struct *task, unsigned long address, unsigned long error_code){
+
+    if (error_code & PF_INSTR){
+		printk(KERN_ALERT "%s: Executing NX flagged page\n",__FUNCTION__);
+    }
+
+    return 0;
+}
+
 
 /*
 Lots of useful stuff in pid.h/pid.c
@@ -2101,7 +2118,6 @@ static int malpage_flipnx_page(unsigned long mmu_mfn){
     cmd = mptr & (MALPAGE_64_MMUPTR_TYPE_MASK);	
     mptr -= cmd; //Ignore the last 4 bits
     ptr = __va(mptr);
-    printk(KERN_ALERT "Marking as Non-Exec\n");
     test_and_set_bit(63,(unsigned long*)ptr); //FIXME, Hardcoded
     printk(KERN_ALERT "Marked as Non-Exec\n");
 

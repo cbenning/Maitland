@@ -90,6 +90,7 @@ int (*kmalpage_update_descriptor)(u64 ma, u64 desc) = NULL;
 int (*kmalpage_multi_update_descriptor)(struct multicall_entry *mcl, u64 maddr,struct desc_struct desc) = NULL;
 int (*kmalpage_update_va_mapping)(unsigned long va, pte_t new_val, unsigned long flags) = NULL;
 int (*kmalpage_multi_update_va_mapping)(struct multicall_entry *mcl, unsigned long va,pte_t new_val, unsigned long flags) = NULL;
+int (*kmalpage_do_page_fault)(struct task_struct *task, unsigned long address, unsigned long error_code) = NULL;
 EXPORT_SYMBOL(kmalpage_mmu_update);
 EXPORT_SYMBOL(kmalpage_multi_mmu_update);
 EXPORT_SYMBOL(kmalpage_mmuext_op);
@@ -98,6 +99,7 @@ EXPORT_SYMBOL(kmalpage_update_descriptor);
 EXPORT_SYMBOL(kmalpage_multi_update_descriptor);
 EXPORT_SYMBOL(kmalpage_update_va_mapping);
 EXPORT_SYMBOL(kmalpage_multi_update_va_mapping);
+EXPORT_SYMBOL(kmalpage_do_page_fault);
 //MALPAGE:END
 
 static int kernel_init(void *);

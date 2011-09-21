@@ -251,6 +251,7 @@ static void malpage_halt_process(struct task_struct *task);
 static void malpage_resume_process(struct task_struct *task);
 static void malpage_kill_process(struct task_struct *task);
 static int malpage_flipnx_page(unsigned long mmu_mfn);
+static int malpage_do_page_fault(struct task_struct *task, unsigned long address, unsigned long error_code);
 
 /************************************************************************
 Grant table and Interdomain Functions
