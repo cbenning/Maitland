@@ -65,7 +65,7 @@
 #include <linux/slab.h>
 
 
-#include <linux/bootmem.h> //For max_pfn
+//#include <linux/bootmem.h> //For max_pfn
 #include <linux/bitmap.h> //For bitmap
 #include <linux/bitops.h>
 
@@ -127,7 +127,7 @@ static int monitor_init(void) {
 	printk(KERN_ALERT "I was assigned major number %d\n", monitor_major);
 	printk(KERN_ALERT "PAGE_SHIFT: %d\n", PAGE_SHIFT);
 	printk(KERN_ALERT "PAGE_SIZE: %lu\n", PAGE_SIZE);
-	printk(KERN_ALERT "max_pfn: %lu\n", max_pfn);
+	//printk(KERN_ALERT "max_pfn: %lu\n", max_pfn);
 	#endif
 		
 	printk(KERN_ALERT "->monitor_init: Loaded.\n");
@@ -451,6 +451,25 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
                         }
 					}
 					break;
+				case MONITOR_RING_NXVIOLATION:
+					
+					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
+
+                        printk(KERN_ALERT "%s: GOT1:%d:%u", __FUNCTION__,req.domid,req.process_id);
+                        //If the process is one we are watching
+						if(monitor_check_page_fault(req.domid,req.process_id,req.mmu_ptr)>0){
+                            
+                            printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
+                            /*
+                            resp.process_id = req.process_id;
+                            resp.domid = req.domid;
+                            resp.mmu_ptr = req.mmu_ptr;
+                            resp.operation = MONITOR_RING_NX; //request mark NX
+                            */
+                            //resp.operation = MONITOR_RING_REPORT; //request report
+                        }
+					}
+					break;
 				default:
 					printk(KERN_ALERT "\nMonitor, Unrecognized operation: %u", req.operation);
 					break;
@@ -615,6 +634,34 @@ static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int 
 	return 0;
 
 }
+
+
+static int monitor_check_page_fault(unsigned int domid, unsigned int process_id, unsigned long address){
+
+	unsigned int i;
+	unsigned long **dom_cursor;
+	unsigned long proc_cursor;
+
+	dom_cursor = monitor_dom_list[domid];
+	if(!dom_cursor){
+		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring NX violation.",__FUNCTION__,domid);
+		return -1;
+	}
+
+	for(i=0; i < MONITOR_MAX_PROCS; i++){
+		proc_cursor = dom_cursor[i];
+		if(proc_cursor && i==process_id){
+
+			printk(KERN_ALERT "%s,Watched Process #%d in Dom:%u is attempting to execute NX page",__FUNCTION__,i,domid);
+			return 1;
+		}
+	}
+	
+	//printk(KERN_ALERT "%s,Unwatched process, ignoring NX violation",__FUNCTION__,mmu_mfn);
+	return 0;
+
+}
+
 
 
 

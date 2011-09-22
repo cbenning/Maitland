@@ -86,6 +86,7 @@
 #define MALPAGE_RING_HALT 5
 #define MALPAGE_RING_MMUUPDATE 6
 #define MALPAGE_RING_NX 7
+#define MALPAGE_RING_NXVIOLATION 8
 
 //Storage constants
 #define MALPAGE_GREF_PAGE_COUNT (PAGE_SIZE/sizeof(unsigned int))-1
@@ -113,6 +114,7 @@
 #define MALPAGE_64_MMUPTR_SHIFT 4 //For killing the last 4 bits
 #define MALPAGE_64_MMUPTR_TYPE_MASK 7ul //For ignoring the last 4 bits
 
+#define MALPAGE_PF_INSTR 1 << 4
 
 /************************************************************************
 Module Interface and Util Structs
@@ -225,6 +227,7 @@ static spinlock_t malpage_mmu_info_lock;
 Interface and Util Functions
 ************************************************************************/
 
+extern int (*kmalpage_do_page_fault)(struct task_struct *task, unsigned long address, unsigned long error_code);
 static int malpage_init(void);
 static void malpage_exit(void);
 static int malpage_report_thread(void* args);

@@ -69,6 +69,7 @@
 #define MONITOR_RING_HALT 5
 #define MONITOR_RING_MMUUPDATE 6
 #define MONITOR_RING_NX 7
+#define MONITOR_RING_NXVIOLATION 8
 
 //Storage constants
 #define MONITOR_GREF_PAGE_COUNT (PAGE_SIZE/sizeof(unsigned int))-1
@@ -88,7 +89,7 @@
 
 #define MONITOR_MAX_VMS 256
 #define MONITOR_MAX_PROCS 65536
-#define MONITOR_MAX_PFNS max_pfn
+//#define MONITOR_MAX_PFNS max_pfn
 //#define MONITOR_MAX_PFNS ULONG_MAX
 
 #define MONITOR_64_MMUPTR_TYPE_MASK 7ul //For ignoring the last 4 bits
@@ -194,6 +195,7 @@ Interface and Util Functions
 static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
 static int monitor_register(monitor_share_info_t *info);
 static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int domid, unsigned int process_id);
+static int monitor_check_page_fault(unsigned int domid, unsigned int process_id, unsigned long address);
 static void monitor_print_watched(void);
 
 

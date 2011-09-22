@@ -235,6 +235,7 @@ extern int (*kmalpage_update_descriptor)(u64 ma, u64 desc);
 extern int (*kmalpage_multi_update_descriptor)(struct multicall_entry *mcl, u64 maddr,struct desc_struct desc);
 extern int (*kmalpage_update_va_mapping)(unsigned long va, pte_t new_val, unsigned long flags);
 extern int (*kmalpage_multi_update_va_mapping)(struct multicall_entry *mcl, unsigned long va,pte_t new_val, unsigned long flags);
+extern int (*kmalpage_do_page_fault)(struct task_struct *task, unsigned long address, unsigned long error_code);
 //MALPAGE:END
 
 

@@ -295,16 +295,9 @@ MMU_PT_UPDATE_PRESERVE_AD:
 static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
 
 	struct request_t *ring_req;
-	int notify;
 	int i;
     pid_t tmp_pid;
-	unsigned long tmp;
-	//unsigned long offset;
-	unsigned long mfn;
-	//unsigned long pfn;
-	//unsigned long *addr;
 	unsigned long cmd;
-	struct page *tmp_page;
 
 	if(count<1 && malpage_share_info){
 		return 0;
@@ -460,8 +453,26 @@ static int malpage_multi_update_va_mapping(struct multicall_entry *mcl, unsigned
 
 static int malpage_do_page_fault(struct task_struct *task, unsigned long address, unsigned long error_code){
 
-    if (error_code & PF_INSTR){
-		printk(KERN_ALERT "%s: Executing NX flagged page\n",__FUNCTION__);
+	struct request_t *ring_req;
+
+    if (error_code & MALPAGE_PF_INSTR){ //If it was caused bu NX flag violation
+		//printk(KERN_ALERT "%s: Executing NX flagged page\n",__FUNCTION__);
+
+        // Write a request into the ring and update the req-prod pointer
+        ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
+        ring_req->operation = MALPAGE_RING_NXVIOLATION;
+        malpage_share_info->fring.req_prod_pvt += 1;
+
+        //ring_req->mmu_mfn = mfn;	
+        ring_req->mmu_ptr = address;	
+        ring_req->domid = malpage_share_info->domid;
+        ring_req->process_id = task->pid;
+
+        // Send a reqest to backend followed by an int if needed
+        //RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify); 
+        RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
+        notify_remote_via_irq(malpage_share_info->irq);
+        
     }
 
     return 0;
@@ -1733,9 +1744,8 @@ static int malpage_xs_report(process_report_t *rep){
 static int malpage_xs_watch(process_report_t *rep){
 
 	struct xenbus_transaction *xstrans;
-	char *pfn_str,*report_frame_path,*domid_str,*report_path, *pid_str;
+	char *domid_str,*report_path, *pid_str;
 	int result;
-	//int i;
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "->malpage_xs_watch\n");
@@ -1962,7 +1972,6 @@ static int malpage_op_process(unsigned int op, unsigned int pid){
 
 	struct task_struct *task;
 
-    task == NULL;
 	//Get task_struct for given pid
 	for_each_process(task) {
 		if ( task->pid == (pid_t)pid) {
@@ -2027,7 +2036,6 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
 	struct response_t *resp;
     RING_IDX rc, rp;
-	struct task_struct *task;
 
 	#ifdef MALPAGE_DEBUG	
 	//printk(KERN_ALERT "DomU: Handling Event\n");
