@@ -458,11 +458,11 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 
-                        printk(KERN_ALERT "%s: GOT1:%d:%u", __FUNCTION__,req.domid,req.process_id);
+                        printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
                         //If the process is one we are watching
 						if(monitor_check_page_fault(req.domid,req.process_id,req.fault_addr)>0){
                             
-                            printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
+                            printk(KERN_ALERT "%s: GOT1:%d:%u", __FUNCTION__,req.domid,req.process_id);
                             /*
                             resp.process_id = req.process_id;
                             resp.domid = req.domid;

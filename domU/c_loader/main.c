@@ -52,6 +52,8 @@ int main( int argc, char* argv[] ){
 				printf("ioctl_msg MALPAGE_WATCH failed\n");
 			}
 
+            sleep(2);
+
             //run the program
 		    ret_val = execvp(command,&argv[2]);
 			

@@ -2107,16 +2107,21 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
 static int malpage_flipnx_page(pte_t *ptep, pte_t pte){
 
-
+    unsigned long pteval;
     /*
     mptr = mmu_mfn;
     cmd = mptr & (MALPAGE_64_MMUPTR_TYPE_MASK);	
     mptr -= cmd; //Ignore the last 4 bits
     ptr = phys_to_virt(mptr);*/
     printk(KERN_ALERT "Marking as Non-Exec\n");
-    set_bit(_PAGE_BIT_NX,ptep);
+
+    //pteval = pte_val(*ptep);
+    //set_bit(_PAGE_BIT_NX,&pteval);
+    pte_set_flags(*ptep,_PAGE_NX);
+
     printk(KERN_ALERT "Marked as Non-Exec\n");
-    return test_bit(_PAGE_BIT_NX,ptep);
+    //return test_bit(_PAGE_BIT_NX,&pteval);
+    return 0;
 }
 
 
