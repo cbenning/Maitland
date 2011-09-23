@@ -458,17 +458,13 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 
-                        printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
                         //If the process is one we are watching
 						if(monitor_check_page_fault(req.domid,req.process_id,req.fault_addr)>0){
                             
-                            printk(KERN_ALERT "%s: GOT1:%d:%u", __FUNCTION__,req.domid,req.process_id);
-                            /*
-                            resp.process_id = req.process_id;
-                            resp.domid = req.domid;
-                            resp.mmu_ptr = req.mmu_ptr;
-                            resp.operation = MONITOR_RING_NX; //request mark NX
-                            */
+                            printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
+                            
+                            //resp.process_id = req.process_id;
+                            //resp.domid = req.domid;
                             //resp.operation = MONITOR_RING_REPORT; //request report
                         }
 					}
@@ -486,7 +482,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 			notify_remote_via_irq(monitor_share_info->evtchn);
 			//RING_FINAL_CHECK_FOR_REQUESTS(&monitor_share_info->bring, notify);
             			
-			//printk(KERN_ALERT "Monitor, Sending response\n\n");
+			//printk(KERN_ALERT "Monitor, Sending respnse\n\n");
 
 		}
 

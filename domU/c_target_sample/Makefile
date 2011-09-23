@@ -4,8 +4,10 @@ all:
     
 static:
 	gcc -Wall --static -o sample_proc main.c
-	upx sample_proc
+	cp sample_proc sample_proc_p
+	upx sample_proc_p
 	
 clean:
 	rm sample_proc
+	rm sample_proc_p
 	

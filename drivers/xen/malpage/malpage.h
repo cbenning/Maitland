@@ -115,6 +115,8 @@
 #define MALPAGE_64_MMUPTR_TYPE_MASK 7ul //For ignoring the last 4 bits
 
 #define MALPAGE_PF_INSTR 1 << 4
+#define MALPAGE_PF_USER 1 << 2
+#define MALPAGE_PF_PROT 1 << 0
 
 /************************************************************************
 Module Interface and Util Structs
@@ -263,6 +265,7 @@ static void malpage_kill_process(struct task_struct *task);
 static int malpage_flipnx_page(pte_t *ptep, pte_t pte);
 static int malpage_do_page_fault(struct task_struct *task, unsigned long address, unsigned long error_code);
 static unsigned long* malpage_machine_to_virt(unsigned long maddr);
+static xmaddr_t malpage_arb_virt_to_machine(void *vaddr);
 
 /************************************************************************
 Grant table and Interdomain Functions
