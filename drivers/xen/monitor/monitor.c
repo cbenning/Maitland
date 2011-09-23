@@ -62,6 +62,7 @@
 #include <xen/events.h>
 #include <config/sys/hypervisor.h>
 #include <asm/hypervisor.h>
+#include <asm/xen/page.h>
 #include <linux/slab.h>
 
 
@@ -397,6 +398,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 		struct response_t resp;
 		int notify;
 		monitor_share_info_t *monitor_share_info;
+        unsigned long* tmp_ptr;
 
 		#ifdef MONITOR_DEBUG
 		//printk(KERN_ALERT "Dom0: Handling Event\n");
@@ -438,15 +440,16 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
                         //If the process is one we are watching
 						if(monitor_check_mmuupdate(req.mmu_ptr,req.mmu_val,req.domid,req.process_id)>0){
+
+                            printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%d:%u", __FUNCTION__,req.domid,req.process_id);
                             
-                            printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%lu:%llu:%d:%u", __FUNCTION__,req.mmu_ptr,req.mmu_val,req.domid,req.process_id);
                             resp.process_id = req.process_id;
                             resp.domid = req.domid;
                             resp.mmu_ptr = req.mmu_ptr;
                             resp.mmu_val = req.mmu_val;
                             resp.operation = MONITOR_RING_NX; //request mark NX
+                            
                             printk(KERN_ALERT "%s: Request mark page Non-Exec", __FUNCTION__);
-
                             //resp.operation = MONITOR_RING_REPORT; //request report
                         }
 					}
@@ -457,7 +460,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
                         printk(KERN_ALERT "%s: GOT1:%d:%u", __FUNCTION__,req.domid,req.process_id);
                         //If the process is one we are watching
-						if(monitor_check_page_fault(req.domid,req.process_id,req.mmu_ptr)>0){
+						if(monitor_check_page_fault(req.domid,req.process_id,req.fault_addr)>0){
                             
                             printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
                             /*
@@ -490,6 +493,11 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 		return IRQ_HANDLED;
 }
 
+
+static unsigned long* monitor_machine_to_virt(unsigned long maddr){
+    unsigned offset = maddr & ~PAGE_MASK;
+    return __va(XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(maddr))) | offset).paddr);
+}
 
 
 static int monitor_report(process_report_t *rep) {
@@ -601,7 +609,8 @@ static void monitor_print_watched(void){
     return;
 }
 
-static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int domid, unsigned int process_id){
+//static int monitor_check_mmuupdate(unsigned long* mmu_ptr, uint64_t mmu_val, int domid, unsigned int process_id){
+static int monitor_check_mmuupdate(pte_t* mmu_ptr, pte_t mmu_val, int domid, unsigned int process_id){
 
 	unsigned int i;
 	unsigned long **dom_cursor;
@@ -615,11 +624,6 @@ static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int 
 
     //printk(KERN_ALERT "%s,Watched Dom:%u is attempting to change PTE",__FUNCTION__,domid);
     //return 1;
-
-	if(mmu_mfn==0){
-		printk(KERN_ALERT "%s, A process in Dom:%u is attempting to add an entry.",__FUNCTION__,domid);
-		return -1;
-	}
 
 	for(i=0; i < MONITOR_MAX_PROCS; i++){
 		proc_cursor = dom_cursor[i];

@@ -638,6 +638,8 @@ deps_/home/chris/workspace/malware_trunk/drivers/xen/monitor/monitor.o := \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/xen/events.h \
   include/config/sys/hypervisor.h \
   /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/hypervisor.h \
+  /home/chris/workspace/dev_lib/modules/linux-2.6-pvops.git/arch/x86/include/asm/xen/page.h \
+    $(wildcard include/config/xen/max/domain/memory.h) \
   /home/chris/workspace/malware_trunk/drivers/xen/monitor/monitor.h \
 
 /home/chris/workspace/malware_trunk/drivers/xen/monitor/monitor.o: $(deps_/home/chris/workspace/malware_trunk/drivers/xen/monitor/monitor.o)

@@ -240,7 +240,7 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 		return 0;
 	}
 	printk(KERN_ALERT "malpage_mmu_update:%u",domid);
-
+    /*
 	spin_lock(&malpage_mmu_info_lock);
 	// Write a request into the ring and update the req-prod pointer
 	ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
@@ -265,7 +265,7 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 	notify_remote_via_irq(malpage_share_info->irq);
 	
 	spin_unlock(&malpage_mmu_info_lock);
-
+    */
 	return 0;
 }
 
@@ -292,18 +292,43 @@ MMU_PT_UPDATE_PRESERVE_AD:
   
 */
 
-static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
+//static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid){
+static int malpage_multi_mmu_update(pte_t *ptep, pte_t pte){
 
 	struct request_t *ring_req;
 	int i;
     pid_t tmp_pid;
 	unsigned long cmd;
+    pte_t* tmp_pte;
 
+    /*
 	if(count<1 && malpage_share_info){
 		return 0;
-	}
+	}*/
 	spin_lock(&malpage_mmu_info_lock);
 
+
+    tmp_pid = current_thread_info()->task->pid;
+
+    // Write a request into the ring and update the req-prod pointer
+    ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
+    ring_req->operation = MALPAGE_RING_MMUUPDATE;
+    malpage_share_info->fring.req_prod_pvt += 1;
+
+    ring_req->mmu_ptr = ptep;
+    //ring_req->mmu_ptr = req[i].ptr;	
+    ring_req->mmu_val = pte;
+    ring_req->domid = malpage_share_info->domid;
+    ring_req->process_id = tmp_pid;
+
+    // Send a reqest to backend followed by an int if needed
+    //RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify); 
+    RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
+    notify_remote_via_irq(malpage_share_info->irq);
+        
+    printk(KERN_ALERT "I just sent a notification to Dom0\n");
+
+    /*
 	for(i=0; i < count; i++){
 		//printk(KERN_ALERT "-MMU_MULTI_UPDATE-------\n");
 
@@ -311,15 +336,6 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
 		//Chop off the least 4 bits, (little endian)
 		//cmd = req[i].ptr & (sizeof(u64)-1);	
 		cmd = req[i].ptr & (MALPAGE_64_MMUPTR_TYPE_MASK);	
-        
-        /*
-		printk(KERN_ALERT "sizeof(uint64_t): %lu\n",sizeof(uint64_t));
-		printk(KERN_ALERT "sizeof(unsigned long): %lu\n",sizeof(unsigned long));
-		printk(KERN_ALERT "sizeof(unsigned long long): %lu\n",sizeof(unsigned long long));
-		printk(KERN_ALERT "PTR: %llu\n",req[i].ptr);
-		printk(KERN_ALERT "CMD: %lx\n",(unsigned long)cmd);
-		printk(KERN_ALERT "VAL: %llu\n",req[i].val);
-        */
 
 		switch(cmd){ 
             case MMU_MACHPHYS_UPDATE:
@@ -331,46 +347,19 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
             default:
 
                 tmp_pid = current_thread_info()->task->pid;
-                //printk(KERN_ALERT "PID: %lu\n",(unsigned long)tmp_pid);
-                //printk(KERN_ALERT "--type: MMU_NORMAL_PT_UPDATE\n");
 
+                tmp_pte = malpage_machine_to_virt(req[i].ptr);
+                malpage_flipnx_page(&(tmp_pte->pte));
 
-                //mfn = req[i].ptr-cmd; //Ignore the last 4 bits
-                //mfn= __va(mfn);
-
-                //tmp = req[i].ptr-cmd; //Ignore the last 4 bits
-                //mfn = tmp >> PAGE_SHIFT;
-
-                /*
-                tmp = 0;
-                tmp = test_bit(63,mfn);
-                printk(KERN_ALERT "64th bit first: %lu\n",tmp);
-                set_bit(63,mfn);
-                tmp = 0;
-                tmp = test_bit(63,mfn);
-                printk(KERN_ALERT "64th bit second: %lu\n",tmp);
-                */
-
-                /*
-                if(mfn){
-
-                    //printk(KERN_ALERT "--mfn: %lu\n",mfn);
-                    
-                    //tmp_pte = mfn_pte(mfn,PAGE_KERNEL);
-                    tmp_page = pfn_to_page(mfn_to_pfn(mfn));
-                    //printk(KERN_ALERT "--page->_mapcount: %d\n",atomic_read(&tmp_page->_mapcount));
-                }
-                else{
-                    mfn = 1;
-                }*/
-
+                break;
+                
                 // Write a request into the ring and update the req-prod pointer
                 ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
                 ring_req->operation = MALPAGE_RING_MMUUPDATE;
                 malpage_share_info->fring.req_prod_pvt += 1;
 
-                //ring_req->mmu_mfn = mfn;	
-                ring_req->mmu_ptr = req[i].ptr;	
+                ring_req->mmu_ptr = malpage_machine_to_virt(req[i].ptr);
+                //ring_req->mmu_ptr = req[i].ptr;	
                 ring_req->mmu_val = req[i].val;
                 ring_req->domid = malpage_share_info->domid;
                 ring_req->process_id = tmp_pid;
@@ -384,7 +373,7 @@ static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_upda
                         
             }
 
-	}
+	}*/
 
 	RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
 	spin_unlock(&malpage_mmu_info_lock);
@@ -464,7 +453,7 @@ static int malpage_do_page_fault(struct task_struct *task, unsigned long address
         malpage_share_info->fring.req_prod_pvt += 1;
 
         //ring_req->mmu_mfn = mfn;	
-        ring_req->mmu_ptr = address;	
+        ring_req->fault_addr = address;	
         ring_req->domid = malpage_share_info->domid;
         ring_req->process_id = task->pid;
 
@@ -1818,7 +1807,6 @@ static int malpage_xs_watch(process_report_t *rep){
 	kfree(domid_str);
 	kfree(pid_str);
 	kfree(xstrans);
-    kfree(result);
 
 	return 0;
 }
@@ -2080,7 +2068,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 				case MALPAGE_RING_NX:
 					//printk(KERN_ALERT  "\nMalpage, Got PAUSEOP: %d,%d\n", resp->operation, resp->process_id);
                     
-                    malpage_flipnx_page(resp->mmu_ptr);
+                    malpage_flipnx_page(resp->mmu_ptr,resp->mmu_val);
 					break;
 
                 case MALPAGE_RING_REPORT:
@@ -2092,7 +2080,6 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
                     
                     report_pid = (pid_t)resp->process_id;
                     up(report_sem); //Notify reporter thread
-
 
 					break;
 
@@ -2118,19 +2105,24 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 }
 
 
-static int malpage_flipnx_page(unsigned long mmu_mfn){
+static int malpage_flipnx_page(pte_t *ptep, pte_t pte){
 
-	unsigned long cmd,ptr,mptr;
 
+    /*
     mptr = mmu_mfn;
     cmd = mptr & (MALPAGE_64_MMUPTR_TYPE_MASK);	
     mptr -= cmd; //Ignore the last 4 bits
-    ptr = __va(mptr);
-    test_and_set_bit(63,(unsigned long*)ptr); //FIXME, Hardcoded
+    ptr = phys_to_virt(mptr);*/
+    printk(KERN_ALERT "Marking as Non-Exec\n");
+    set_bit(_PAGE_BIT_NX,ptep);
     printk(KERN_ALERT "Marked as Non-Exec\n");
+    return test_bit(_PAGE_BIT_NX,ptep);
+}
 
-    return test_bit(63,(unsigned long*)ptr);
-    
+
+static unsigned long* malpage_machine_to_virt(unsigned long maddr){
+    unsigned offset = maddr & ~PAGE_MASK;
+    return __va(XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(maddr))) | offset).paddr);
 }
 
 /*

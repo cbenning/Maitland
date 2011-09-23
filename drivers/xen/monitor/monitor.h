@@ -133,9 +133,12 @@ struct request_t {
 	process_report_t report;
 	unsigned int process_id;
 	int domid;
-	//uint64_t mmu_mfn;
-	unsigned long mmu_ptr;
-	uint64_t mmu_val;
+	//uint64_t mmu_ptr;
+	//unsigned long* mmu_ptr;
+	pte_t* mmu_ptr;
+	unsigned long fault_addr;
+	//uint64_t mmu_val;
+	pte_t mmu_val;
 };
 
 struct response_t {
@@ -146,8 +149,11 @@ struct response_t {
 	unsigned int process_id;
 	int domid;
 	//uint64_t mmu_ptr;
-	unsigned long mmu_ptr;
-	uint64_t mmu_val;
+	//unsigned long* mmu_ptr;
+	pte_t* mmu_ptr;
+	unsigned long fault_addr;
+	//uint64_t mmu_val;
+	pte_t mmu_val;
 };
 
 // The following defines the types to be used in the shared ring
@@ -194,7 +200,8 @@ Interface and Util Functions
 ************************************************************************/
 static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
 static int monitor_register(monitor_share_info_t *info);
-static int monitor_check_mmuupdate(unsigned long mmu_mfn, uint64_t mmu_val, int domid, unsigned int process_id);
+//static int monitor_check_mmuupdate(unsigned long* mmu_ptr, uint64_t mmu_val, int domid, unsigned int process_id);
+static int monitor_check_mmuupdate(pte_t* mmu_ptr, pte_t mmu_val, int domid, unsigned int process_id);
 static int monitor_check_page_fault(unsigned int domid, unsigned int process_id, unsigned long address);
 static void monitor_print_watched(void);
 
@@ -216,6 +223,7 @@ static int monitor_op_process(unsigned int op, unsigned int pid);
 static void monitor_halt_process(unsigned int pid);
 static void monitor_resume_process(unsigned int pid);
 static void monitor_kill_process(unsigned int pid);
+static unsigned long* monitor_machine_to_virt(unsigned long maddr);
 
 /************************************************************************
 Kernel module bindings

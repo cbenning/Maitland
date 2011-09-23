@@ -161,9 +161,12 @@ struct request_t {
 	process_report_t report;
 	unsigned int process_id;
 	int domid;
-	//uint64_t mmu_mfn;
-	unsigned long mmu_ptr;
-	uint64_t mmu_val;
+	//uint64_t mmu_ptr;
+	//unsigned long* mmu_ptr;
+	pte_t* mmu_ptr;
+	unsigned long fault_addr;
+	//uint64_t mmu_val;
+	pte_t mmu_val;
 };
 
 struct response_t {
@@ -174,8 +177,11 @@ struct response_t {
 	unsigned int process_id;
 	int domid;
 	//uint64_t mmu_ptr;
-	unsigned long mmu_ptr;
-	uint64_t mmu_val;
+	//unsigned long* mmu_ptr;
+	pte_t* mmu_ptr;
+	unsigned long fault_addr;
+	//uint64_t mmu_val;
+	pte_t mmu_val;
 };
  
 // The following defines the types to be used in the shared ring
@@ -234,7 +240,8 @@ static int malpage_report_thread(void* args);
 static int malpage_process_op_thread(void* args);
 static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
 static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
-static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
+//static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
+static int malpage_multi_mmu_update(pte_t *ptep, pte_t pte);
 static int malpage_mmuext_op(struct mmuext_op *op, int count, int *success_count, domid_t domid);
 static int malpage_multi_mmuext_op(struct multicall_entry *mcl, struct mmuext_op *op, int count, int *success_count, domid_t domid);
 static int malpage_update_descriptor(u64 ma, u64 desc);
@@ -253,8 +260,9 @@ static int malpage_op_process(unsigned int op, unsigned int pid);
 static void malpage_halt_process(struct task_struct *task);
 static void malpage_resume_process(struct task_struct *task);
 static void malpage_kill_process(struct task_struct *task);
-static int malpage_flipnx_page(unsigned long mmu_mfn);
+static int malpage_flipnx_page(pte_t *ptep, pte_t pte);
 static int malpage_do_page_fault(struct task_struct *task, unsigned long address, unsigned long error_code);
+static unsigned long* malpage_machine_to_virt(unsigned long maddr);
 
 /************************************************************************
 Grant table and Interdomain Functions

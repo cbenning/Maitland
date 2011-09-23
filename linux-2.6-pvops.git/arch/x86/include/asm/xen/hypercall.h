@@ -227,15 +227,10 @@ HYPERVISOR_set_trap_table(struct trap_info *table)
 
 
 //MALPAGE:START
+/*
 extern int (*kmalpage_mmu_update)(struct mmu_update *req, int count,int *success_count, domid_t domid);
 extern int (*kmalpage_multi_mmu_update)(struct multicall_entry *mcl, struct mmu_update *req, int count, int *success_count, domid_t domid);
-extern int (*kmalpage_mmuext_op)(struct mmuext_op *op, int count, int *success_count, domid_t domid);
-extern int (*kmalpage_multi_mmuext_op)(struct multicall_entry *mcl, struct mmuext_op *op, int count, int *success_count, domid_t domid);
-extern int (*kmalpage_update_descriptor)(u64 ma, u64 desc);
-extern int (*kmalpage_multi_update_descriptor)(struct multicall_entry *mcl, u64 maddr,struct desc_struct desc);
-extern int (*kmalpage_update_va_mapping)(unsigned long va, pte_t new_val, unsigned long flags);
-extern int (*kmalpage_multi_update_va_mapping)(struct multicall_entry *mcl, unsigned long va,pte_t new_val, unsigned long flags);
-extern int (*kmalpage_do_page_fault)(struct task_struct *task, unsigned long address, unsigned long error_code);
+*/
 //MALPAGE:END
 
 
@@ -248,9 +243,10 @@ HYPERVISOR_mmu_update(struct mmu_update *req, int count,
 	mmu_update-> uint64_t val;  // New contents of PTE.
 	 */
 	
+    /*
 	if(kmalpage_mmu_update!=NULL){
 		kmalpage_mmu_update(req,count,success_count,domid);
-	}
+	}*/
 
 	return _hypercall4(int, mmu_update, req, count, success_count, domid);
 }
@@ -262,9 +258,10 @@ HYPERVISOR_mmuext_op(struct mmuext_op *op, int count,
 		     int *success_count, domid_t domid)
 {	
 	//MALPAGE
+    /*
 	if(kmalpage_mmuext_op!=NULL){
 		kmalpage_mmuext_op(op,count,success_count,domid);
-	}
+	}*/
 
 	return _hypercall4(int, mmuext_op, op, count, success_count, domid);
 }
@@ -362,9 +359,10 @@ HYPERVISOR_update_descriptor(u64 ma, u64 desc)
 	if (sizeof(u64) == sizeof(long))
 
 		//MALPAGE
+        /*
 		if(kmalpage_update_descriptor!=NULL){
 			kmalpage_update_descriptor(ma,desc);
-		}
+		}*/
 
 		return _hypercall2(int, update_descriptor, ma, desc);
 	return _hypercall4(int, update_descriptor, ma, ma>>32, desc, desc>>32);
@@ -389,9 +387,10 @@ HYPERVISOR_update_va_mapping(unsigned long va, pte_t new_val,
 	if (sizeof(new_val) == sizeof(long)){
 
 		//MALPAGE
+        /*
 		if(kmalpage_update_va_mapping!=NULL){
 			kmalpage_update_va_mapping(va,new_val,flags);
-		}
+		}*/
 
 		return _hypercall3(int, update_va_mapping, va,
 				   new_val.pte, flags);
@@ -525,9 +524,10 @@ MULTI_update_va_mapping(struct multicall_entry *mcl, unsigned long va,
 	if (sizeof(new_val) == sizeof(long)) {
 
 		//MALPAGE
+        /*
 		if(kmalpage_multi_update_va_mapping!=NULL){
 			kmalpage_multi_update_va_mapping(mcl,va,new_val,flags);
-		}
+		}*/
 
 		mcl->args[1] = new_val.pte;
 	} else {
@@ -574,9 +574,10 @@ MULTI_update_descriptor(struct multicall_entry *mcl, u64 maddr,
 	if (sizeof(maddr) == sizeof(long)) {
 
 		//MALPAGE
+        /*
 		if(kmalpage_multi_update_descriptor!=NULL){
 			kmalpage_multi_update_descriptor(mcl,maddr,desc);
-		}
+		}*/
 
 		mcl->args[0] = maddr;
 		mcl->args[1] = *(unsigned long *)&desc;
@@ -603,9 +604,10 @@ MULTI_mmu_update(struct multicall_entry *mcl, struct mmu_update *req,
 		 int count, int *success_count, domid_t domid)
 {
 	//MALPAGE
+    /*
 	if(kmalpage_multi_mmu_update!=NULL){
 		kmalpage_multi_mmu_update(mcl,req,count,success_count,domid);
-	}
+	}*/
 	
 	mcl->op = __HYPERVISOR_mmu_update;
 	mcl->args[0] = (unsigned long)req;
@@ -619,9 +621,10 @@ MULTI_mmuext_op(struct multicall_entry *mcl, struct mmuext_op *op, int count,
 		int *success_count, domid_t domid)
 {
 	//MALPAGE
+    /*
 	if(kmalpage_multi_mmuext_op!=NULL){
 		kmalpage_multi_mmuext_op(mcl,op,count,success_count,domid);
-	}
+	}*/
 
 	mcl->op = __HYPERVISOR_mmuext_op;
 	mcl->args[0] = (unsigned long)op;
