@@ -43,6 +43,10 @@ MONITOR_REGISTER = MONITOR_IOC_MAGIC+8
 MONITOR_DEREGISTER = MONITOR_IOC_MAGIC+9
 MONITOR_WATCH = MONITOR_IOC_MAGIC+10
 MONITOR_DUMP = MONITOR_IOC_MAGIC+11
+MONITOR_RESUME = MONITOR_IOC_MAGIC+12
+MONITOR_KILL = MONITOR_IOC_MAGIC+13
+MONITOR_DONE_REPORT = MONITOR_IOC_MAGIC+14
+
 MONITOR_MIN_DOMID = 1
 MONITOR_MAX_DOMID = 255
 
@@ -154,14 +158,16 @@ def watch_domain_report(path, xs):
         dirs = xs.ls(th, reg_path+MONITOR_XS_REPORT_GREF_PATH)
         xs.transaction_end(th)
         
+
         grefs = []
         pfns = []
         count = 0
-        
         th = xs.transaction_start()    
         for dir in dirs:
             grefs.append(int(dir))
-            pfns.append(int(xs.read(th,reg_path+MONITOR_XS_REPORT_GREF_PATH+"/"+str(dir))))
+            #print reg_path+MONITOR_XS_REPORT_GREF_PATH+"/"+str(dir)
+            tmp = xs.read(th,reg_path+MONITOR_XS_REPORT_GREF_PATH+"/"+str(dir))
+            pfns.append(int(tmp))
             count += 1
         
         domid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_DOMID_PATH))
@@ -169,15 +175,16 @@ def watch_domain_report(path, xs):
         
         xs.transaction_end(th)
         
-        
         print "Received "+str(count)+" grefs, now removing report"
-        
         
         #Nuke the report 
         th = xs.transaction_start()    
-        xs.rm(th, reg_path)
+        #xs.rm(th, reg_path)
+        dirs = xs.ls(th, reg_path)
+        for dir in dirs:
+            print "removing: "+str(reg_path)+"/"+str(dir)
+            xs.rm(th,reg_path+"/"+dir)
         xs.transaction_end(th)    
-       
         
         print "Sending report to Monitor module..."       
         
@@ -186,15 +193,15 @@ def watch_domain_report(path, xs):
         grefArr = array.array('I',grefs)    
         pfnArr = array.array('L',pfns)
                 
-        print "grefsize"+str(grefArr.itemsize)
-        print "pfnsize"+str(pfnArr.itemsize)
+        #print "GOT:"+str(sys._getframe().f_lineno) #FIXME
         
         ops = Monitor(MONITOR_DEVICE)
         print "Sending args"
         procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],grefArr.buffer_info()[0],count)
         ops.doMonitorOp(MONITOR_REPORT, procStruct)
         ops.close()
-        
+
+        ''' 
         print "Dumping memory"
         f1 = open(MONITOR_DEVICE,"rb")
         filename = MONITOR_DUMP_DIR+""+str(pid)+"_dump.bin"
@@ -210,10 +217,42 @@ def watch_domain_report(path, xs):
         
         f1.close()
         f2.close()
-        
-        
+        '''
+
+        print "looking for searchstring"
+        op = MONITOR_RESUME
+        search_str = "test"
+        index = 1096
+        f1 = open(MONITOR_DEVICE,"rb")
+        new_chunk = f1.read(index)
+        str1 = ''
+        str2 = ''
+        while(new_chunk):
+            str1 = str2
+            str2 = new_chunk
+            combined = str(str1+str2)
+            if(str.find(combined,search_str)>=0):
+                print "Found searchstring"
+                op = MONITOR_KILL
+                break
+            f1.seek(index)
+            index += index
+            new_chunk = f1.read(1096)
+        f1.close()
+
+
+        ops = Monitor(MONITOR_DEVICE)
+        procStruct = struct.pack("I",0)
+        print "Sending Done Report"
+        ops.doMonitorOp(MONITOR_DONE_REPORT, procStruct)
+
+        print "Sending process cmd:"+str(op)
+        ops.doMonitorOp(op, procStruct)
+        ops.close()
+        print "GOT:"+str(sys._getframe().f_lineno) #FIXME
         #remove watch
-        return False
+        #return False
+        return True
     
     return True
     
@@ -268,7 +307,7 @@ def watch_domain_watchreport(path, xs):
         ops.doMonitorOp(MONITOR_WATCH, procStruct)
         ops.close()
         
-        print "Reported"     
+        print "WatchReported"     
        
         #remove watch
         return False

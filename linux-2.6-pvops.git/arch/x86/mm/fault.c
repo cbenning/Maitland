@@ -988,10 +988,7 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		kmemcheck_hide(regs);
 	prefetchw(&mm->mmap_sem);
 
-	//MALPAGE
-	if(kmalpage_do_page_fault!=NULL){
-		kmalpage_do_page_fault(tsk,address,error_code);
-	}
+
 
 	if (unlikely(kmmio_fault(regs, address)))
 		return;
@@ -1143,6 +1140,12 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault:
 	 */
+
+	//MALPAGE
+	if(kmalpage_do_page_fault!=NULL){
+		kmalpage_do_page_fault(tsk,address,error_code);
+	}
+
 	fault = handle_mm_fault(mm, vma, address, write ? FAULT_FLAG_WRITE : 0);
 
 	if (unlikely(fault & VM_FAULT_ERROR)) {

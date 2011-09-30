@@ -8,6 +8,7 @@ all:
 	cd ./drivers/xen/genshm-back ; make
 	#cd ./drivers/xen/process_stop ; make
 	cd ./domU/c_target_sample ; make static
+	cd ./domU/c_target_sample2 ; make static
 	cd ./domU/c_loader ; make
 
 clean: 
@@ -17,4 +18,5 @@ clean:
 	cd ./drivers/xen/genshm-back ; make clean
 	#cd ./drivers/xen/process_stop ; make clean
 	cd ./domU/c_target_sample ; make clean
+	cd ./domU/c_target_sample2 ; make clean
 	cd ./domU/c_loader ; make clean

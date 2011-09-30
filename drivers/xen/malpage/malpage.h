@@ -114,9 +114,11 @@
 #define MALPAGE_64_MMUPTR_SHIFT 4 //For killing the last 4 bits
 #define MALPAGE_64_MMUPTR_TYPE_MASK 7ul //For ignoring the last 4 bits
 
-#define MALPAGE_PF_INSTR 1 << 4
-#define MALPAGE_PF_USER 1 << 2
 #define MALPAGE_PF_PROT 1 << 0
+#define MALPAGE_PF_WRITE 1 << 1
+#define MALPAGE_PF_USER 1 << 2
+#define MALPAGE_PF_RSVD 1 << 3
+#define MALPAGE_PF_INSTR 1 << 4
 
 /************************************************************************
 Module Interface and Util Structs
@@ -266,6 +268,7 @@ static int malpage_flipnx_page(pte_t *ptep, pte_t pte);
 static int malpage_do_page_fault(struct task_struct *task, unsigned long address, unsigned long error_code);
 static unsigned long* malpage_machine_to_virt(unsigned long maddr);
 static xmaddr_t malpage_arb_virt_to_machine(void *vaddr);
+static void* malpage_kzalloc(size_t size);
 
 /************************************************************************
 Grant table and Interdomain Functions
@@ -288,7 +291,6 @@ static int malpage_alloc_evtchn(int domid, int *port);
 static int malpage_free_evtchn(int port);
 static int malpage_xs_report(process_report_t *rep);
 static int malpage_dump_file(process_report_t *rep);
-
 
 /************************************************************************
 Kernel module bindings

@@ -49,6 +49,9 @@
 #define MONITOR_DEREGISTER MONITOR_IOC_MAGIC+9
 #define MONITOR_WATCH MONITOR_IOC_MAGIC+10
 #define MONITOR_DUMP MONITOR_IOC_MAGIC+11
+#define MONITOR_RESUME MONITOR_IOC_MAGIC+12
+#define MONITOR_KILL MONITOR_IOC_MAGIC+13
+#define MONITOR_DONE_REPORT MONITOR_IOC_MAGIC+14
 
 //Debug enabled
 #define MONITOR_DEBUG 1
@@ -183,9 +186,9 @@ static int monitor_minor = 0;
 static dev_t monitor_dev;
 static struct cdev monitor_cdev;
 static struct class* monitor_class;
-struct vm_struct** vm_struct_list;
-int vm_struct_list_size;
-
+static struct vm_struct** vm_struct_list;
+static int vm_struct_list_size;
+static int report_in_progress;
 
 /************************************************************************
 Grant table and Interdomain Variables
@@ -193,6 +196,7 @@ Grant table and Interdomain Variables
 static struct as_sring *sring;
 static monitor_share_info_t *monitor_share_info;
 static unsigned long ***monitor_dom_list;
+static unsigned int curr_proc;
 
 
 /************************************************************************

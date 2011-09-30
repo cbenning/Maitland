@@ -137,6 +137,8 @@ static int monitor_init(void) {
 	monitor_dom_list = kzalloc(sizeof(unsigned long*)*MONITOR_MAX_VMS,GFP_KERNEL);
 	//monitor_dom_list = flex_array_alloc(sizeof(struct flex_array*),MONITOR_MAX_VMS,GFP_KERNEL);
 
+    curr_proc = NULL;
+    report_in_progress = 0;
 	return 0;
 }
 
@@ -183,8 +185,15 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#ifdef MONITOR_DEBUG
 			printk(KERN_ALERT "Received report\n");
 			#endif
+
+            if(report_in_progress){
+                return 0;
+            }
+
+            report_in_progress = 1;
 			rep = monitor_populate_report(arg);
 			monitor_report(rep);
+
 			return 0;
 		break;
 		case MONITOR_DUMP:
@@ -194,11 +203,40 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			monitor_print_watched();
 			return 0;
 		break;
+		case MONITOR_DONE_REPORT:
+			#ifdef MONITOR_DEBUG
+			printk(KERN_ALERT "Received Done Report\n");
+			#endif
+			if(report_in_progress){
+                report_in_progress = 0;
+            }
+			return 0;
+		break;
+		case MONITOR_RESUME:
+			#ifdef MONITOR_DEBUG
+			printk(KERN_ALERT "Received Resume\n");
+			#endif
+            if(curr_proc!=NULL){
+
+			    printk(KERN_ALERT "Resuming %u\n",curr_proc);
+    			monitor_resume_process(curr_proc);
+                curr_proc = NULL;
+            }
+			return 0;
+		break;
+		case MONITOR_KILL:
+			#ifdef MONITOR_DEBUG
+			printk(KERN_ALERT "Received Kill\n");
+			#endif
+			if(curr_proc!=NULL){
+    			monitor_kill_process(curr_proc);
+                curr_proc = NULL;
+            }			return 0;
+		break;
 		case MONITOR_WATCH:
 			#ifdef MONITOR_DEBUG
 			printk(KERN_ALERT "Received watch report\n");
 			#endif
-			//rep = monitor_populate_report(arg);
 			monitor_watch(arg);
 			return 0;
 		break;
@@ -389,8 +427,6 @@ static int monitor_register(monitor_share_info_t *info){
 
 
 
-
-
 static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
 		RING_IDX rc, rp;
@@ -429,9 +465,10 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 				case MONITOR_RING_REPORT :
 				
 					printk(KERN_ALERT "\nMonitor, Got MONITOR_RING_REPORT op: %u", req.operation);
-
-					resp.operation = monitor_report(&(req.report));
-					resp.report = req.report;
+                    
+    					resp.operation = monitor_report(&(req.report));
+    					resp.report = req.report;
+  
 					break;
 
 				case MONITOR_RING_MMUUPDATE:
@@ -441,7 +478,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
                         //If the process is one we are watching
 						if(monitor_check_mmuupdate(req.mmu_ptr,req.mmu_val,req.domid,req.process_id)>0){
 
-                            printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%d:%u", __FUNCTION__,req.domid,req.process_id);
+                            //printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%d:%u", __FUNCTION__,req.domid,req.process_id);
                             
                             resp.process_id = req.process_id;
                             resp.domid = req.domid;
@@ -449,7 +486,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
                             resp.mmu_val = req.mmu_val;
                             resp.operation = MONITOR_RING_NX; //request mark NX
                             
-                            printk(KERN_ALERT "%s: Request mark page Non-Exec", __FUNCTION__);
+                            //printk(KERN_ALERT "%s: Request mark page Non-Exec", __FUNCTION__);
                             //resp.operation = MONITOR_RING_REPORT; //request report
                         }
 					}
@@ -462,10 +499,14 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 						if(monitor_check_page_fault(req.domid,req.process_id,req.fault_addr)>0){
                             
                             printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
-                            
-                            //resp.process_id = req.process_id;
-                            //resp.domid = req.domid;
-                            //resp.operation = MONITOR_RING_REPORT; //request report
+
+                                resp.process_id = req.process_id;
+                                resp.domid = req.domid;
+                                resp.operation = MONITOR_RING_REPORT; //request report
+
+                        }
+                        else{
+                            //monitor_resume_process(req.process_id);
                         }
 					}
 					break;
@@ -475,10 +516,12 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					  
 			}
 
+		    //printk(KERN_ALERT "\nMonitor, sending operation: %u", resp.operation);
 			memcpy(RING_GET_RESPONSE(&monitor_share_info->bring, monitor_share_info->bring.rsp_prod_pvt), &resp, sizeof(resp));
 			monitor_share_info->bring.rsp_prod_pvt++;
 
-			RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&monitor_share_info->bring, notify);
+			//RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&monitor_share_info->bring, notify);
+			RING_PUSH_RESPONSES(&monitor_share_info->bring);
 			notify_remote_via_irq(monitor_share_info->evtchn);
 			//RING_FINAL_CHECK_FOR_REQUESTS(&monitor_share_info->bring, notify);
             			
@@ -508,7 +551,7 @@ static int monitor_report(process_report_t *rep) {
 	printk(KERN_ALERT "	process_id: %u\n",rep->process_id);
 	printk(KERN_ALERT "	domid: %u\n",rep->domid);
 	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
-	printk(KERN_ALERT "	pfn_list:	");
+	//printk(KERN_ALERT "	pfn_list:	");
 
 	/*
 	for(i=0; i < rep->pfn_list_length; i++){
@@ -531,19 +574,29 @@ static int monitor_report(process_report_t *rep) {
 
 	printk(KERN_ALERT "Successfully mapped %d pages",vm_struct_list_size);
 
+    curr_proc = rep->process_id;
 	//Do analysis
 
 	//Unmap RANGE
 
 	//Kill process
 	//return MONITOR_RING_KILL;
-    monitor_kill_process(rep->process_id);
+    //monitor_kill_process(rep->process_id);
+    //monitor_resume_process(rep->process_id);
 
 	//Dont Kill process
 	//return MONITOR_RING_RESUME;
 
     return 0;
 }
+
+
+static int monitor_scan(struct vm_struct** vm_struct_list, int vm_struct_list_size){
+
+    
+
+}
+
 
 
 static int monitor_watch(unsigned long arg){
@@ -642,6 +695,9 @@ static int monitor_check_page_fault(unsigned int domid, unsigned int process_id,
 	unsigned long **dom_cursor;
 	unsigned long proc_cursor;
 
+    
+	printk(KERN_ALERT "%s, Searching for %d: %d\n.",__FUNCTION__,domid,process_id);
+
 	dom_cursor = monitor_dom_list[domid];
 	if(!dom_cursor){
 		printk(KERN_ALERT "%s, Dom: %u is not registered, ignoring NX violation.",__FUNCTION__,domid);
@@ -723,8 +779,7 @@ static struct vm_struct* monitor_map_gref(unsigned int gref, unsigned int domid)
 		v_start->size = 0;
 	}
 
-	printk(KERN_ALERT "monitor_map_gref: HYPERVISOR mapping gref: %d\n",gref);
-
+	//printk(KERN_ALERT "monitor_map_gref: HYPERVISOR mapping gref: %d\n",gref);
 
 
 	gnttab_set_map_op(&ops, ((unsigned long)(v_start->addr)), GNTMAP_host_map|GNTMAP_readonly, (grant_ref_t)gref, (domid_t)domid );
