@@ -217,7 +217,6 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			printk(KERN_ALERT "Received Resume\n");
 			#endif
             if(curr_proc!=NULL){
-
 			    printk(KERN_ALERT "Resuming %u\n",curr_proc);
     			monitor_resume_process(curr_proc);
                 curr_proc = NULL;
@@ -231,7 +230,8 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			if(curr_proc!=NULL){
     			monitor_kill_process(curr_proc);
                 curr_proc = NULL;
-            }			return 0;
+            }			
+            return 0;
 		break;
 		case MONITOR_WATCH:
 			#ifdef MONITOR_DEBUG
@@ -461,48 +461,45 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 			barrier();
 
 			switch (req.operation) {
-			
+
 				case MONITOR_RING_REPORT :
-				
-					printk(KERN_ALERT "\nMonitor, Got MONITOR_RING_REPORT op: %u", req.operation);
-                    
+
+				    	printk(KERN_ALERT "\nMonitor, Got MONITOR_RING_REPORT op: %u", req.operation);
     					resp.operation = monitor_report(&(req.report));
     					resp.report = req.report;
-  
+
 					break;
 
-				case MONITOR_RING_MMUUPDATE:
-					
+				case MONITOR_RING_MMUUPDATE:	
+
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 
                         //If the process is one we are watching
 						if(monitor_check_mmuupdate(req.mmu_ptr,req.mmu_val,req.domid,req.process_id)>0){
 
                             //printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%d:%u", __FUNCTION__,req.domid,req.process_id);
-                            
                             resp.process_id = req.process_id;
                             resp.domid = req.domid;
                             resp.mmu_ptr = req.mmu_ptr;
                             resp.mmu_val = req.mmu_val;
                             resp.operation = MONITOR_RING_NX; //request mark NX
-                            
                             //printk(KERN_ALERT "%s: Request mark page Non-Exec", __FUNCTION__);
                             //resp.operation = MONITOR_RING_REPORT; //request report
+
                         }
 					}
 					break;
 				case MONITOR_RING_NXVIOLATION:
-					
+	
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 
                         //If the process is one we are watching
 						if(monitor_check_page_fault(req.domid,req.process_id,req.fault_addr)>0){
-                            
+ 
                             printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
-
-                                resp.process_id = req.process_id;
-                                resp.domid = req.domid;
-                                resp.operation = MONITOR_RING_REPORT; //request report
+                            resp.process_id = req.process_id;
+                            resp.domid = req.domid;
+                            resp.operation = MONITOR_RING_REPORT; //request report
 
                         }
                         else{
@@ -524,7 +521,6 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 			RING_PUSH_RESPONSES(&monitor_share_info->bring);
 			notify_remote_via_irq(monitor_share_info->evtchn);
 			//RING_FINAL_CHECK_FOR_REQUESTS(&monitor_share_info->bring, notify);
-            			
 			//printk(KERN_ALERT "Monitor, Sending respnse\n\n");
 
 		}
@@ -546,18 +542,14 @@ static int monitor_report(process_report_t *rep) {
 	struct vm_struct* tmp_vm_struct;
 
 	#ifdef MONITOR_DEBUG
-
 	printk(KERN_ALERT "Dom0: Report Received:\n");
 	printk(KERN_ALERT "	process_id: %u\n",rep->process_id);
 	printk(KERN_ALERT "	domid: %u\n",rep->domid);
 	printk(KERN_ALERT "	pfn_list_length: %u\n",rep->pfn_list_length);
 	//printk(KERN_ALERT "	pfn_list:	");
-
-	/*
-	for(i=0; i < rep->pfn_list_length; i++){
+	/*for(i=0; i < rep->pfn_list_length; i++){
 		printk(KERN_ALERT "%lu",rep->pfn_list[i]);
-	}
-*/
+	}*/
 	#endif
 
 	vm_struct_list = kzalloc(rep->pfn_list_length*PAGE_SIZE,0);
@@ -590,12 +582,6 @@ static int monitor_report(process_report_t *rep) {
     return 0;
 }
 
-
-static int monitor_scan(struct vm_struct** vm_struct_list, int vm_struct_list_size){
-
-    
-
-}
 
 
 

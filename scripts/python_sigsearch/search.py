@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys
+import sys,binascii
 
 def search(prog, string):
         print "Searchstring: "+str(string)
@@ -15,13 +15,15 @@ def search(prog, string):
             str1 = str2
             str2 = new_chunk
             combined = str(str1+str2)
-            if(str.find(combined,string)>=0):
+            tmp = binascii.a2b_qp(string)
+            if(str.find(combined,tmp)>=0):
                 print "Found searchstring"
                 break
+            print "Advancing to byte "+str(index)
             f1.seek(index)
             index += index
             new_chunk = f1.read(1096)
         f1.close()
 
 
-main(sys.argv[1].sys.argv[2])
+search(sys.argv[1],sys.argv[2])

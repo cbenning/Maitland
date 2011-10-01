@@ -215,7 +215,7 @@ static int malpage_process_op_thread(void* args){
     printk(KERN_ALERT "process op thread spawned");
     while(process_op_running){
         down(process_op_sem); //Wait until I am notified and should go again
-        printk(KERN_ALERT "process %d handled",process_op_pid);
+        //printk(KERN_ALERT "process %d handled",process_op_pid);
         malpage_op_process(process_op_op,process_op_pid);
     }
     return 0;
@@ -417,9 +417,7 @@ static int malpage_do_page_fault(struct task_struct *task, unsigned long address
     
     if (error_code & MALPAGE_PF_INSTR && error_code & MALPAGE_PF_USER && !(error_code & MALPAGE_PF_PROT)){ //If it was caused bu NX flag violation
 		
-        printk(KERN_ALERT "%s: Executing NX flagged page\n",__FUNCTION__);
-        //printk(KERN_ALERT "%s: NX:%                    
-        //malpage_halt_process(task); 
+        //printk(KERN_ALERT "%s: Executing NX flagged page\n",__FUNCTION__);
 
         // Write a request into the ring and update the req-prod pointer
         ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
@@ -462,7 +460,19 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#ifdef MALPAGE_DEBUG
 			printk(KERN_ALERT "Reporting\n");
 			#endif
+            
+			//Get task_struct for given pid
+			for_each_process(task) {
+				if ( task->pid == procID) {
+					break;
+				}
+			}
 
+			#ifdef MALPAGE_DEBUG
+			printk(KERN_ALERT "Stopping process %d\n",procID);
+			#endif
+    
+			malpage_halt_process(task);
 			return malpage_report(procID,malpage_share_info);
 		break;
 		case MALPAGE_WATCH:
@@ -475,7 +485,7 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#ifdef MALPAGE_DEBUG
 			printk(KERN_ALERT "Testing\n");
 			#endif
-
+            /*
 			//Get task_struct for given pid
 			for_each_process(task) {
 				if ( task->pid == procID) {
@@ -489,7 +499,7 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 
 			malpage_halt_process(task);
 			pfnlist_vmarea(task,0,0);
-
+            */
 			return 0;
 		break;
 		default:
@@ -857,18 +867,14 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 				anon_vma_count++;
 				//Set root if we havent already
 				if(!root_exists){
-                    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 					pfn_root = malpage_kzalloc(sizeof(pfn_ll_node));
-                    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 					pfn_root->pfn = new_mfn;
 					pfn_root->next = (void*)NULL;
 					root_exists = 1;
 					tmp_pfn_root = pfn_root;
 				}
 				else{
-                    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 					tmp_pfn = malpage_kzalloc(sizeof(pfn_ll_node));
-                    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 					tmp_pfn->pfn = new_mfn;
 					tmp_pfn->next = (void*)NULL;
 					tmp_pfn_root->next = tmp_pfn;
@@ -943,18 +949,14 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                             page_all_count++;
                             //Set root if we havent already
                             if(!root_exists){
-	                            printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
                                 pfn_root = malpage_kzalloc(sizeof(pfn_ll_node));
-	                            printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
                                 pfn_root->pfn = new_mfn;
                                 pfn_root->next = (void*)NULL;
                                 root_exists = 1;
                                 tmp_pfn_root = pfn_root;
                             }
                             else{
-	                            printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
                                 tmp_pfn = malpage_kzalloc(sizeof(pfn_ll_node));
-	                            printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
                                 tmp_pfn->pfn = new_mfn;
                                 tmp_pfn->next = (void*)NULL;
                                 tmp_pfn_root->next = tmp_pfn;
@@ -1639,8 +1641,6 @@ static int malpage_xs_report(process_report_t *rep){
 	//Put grefs and frams nums in XS
 	//ULONG_MAX: 18446744073709551615
 
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__); //FIXME
-
 	report_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str),0);
 	if((result = sprintf(report_path, "%s/%s",MALPAGE_XS_REPORT_PATH, domid_str)) < 1){
 		#ifdef MALPAGE_DEBUG
@@ -1649,7 +1649,6 @@ static int malpage_xs_report(process_report_t *rep){
 		return MALPAGE_GENERALERR;
 	}
 
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__); //FIXME
 /*
 	report_pfn_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_FRAME_PATH),0);
 	if((result = sprintf(report_pfn_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_FRAME_PATH)) < 1){
@@ -1671,14 +1670,12 @@ static int malpage_xs_report(process_report_t *rep){
 		return MALPAGE_GENERALERR;
 	}
 
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__); //FIXME
 	//Make frame dir
 	result = xenbus_mkdir(*xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH);
 
 	pfn_str = kzalloc(strlen("18446744073709551615"),0);
 	gref_str = kzalloc(strlen("100000"),0);
 
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__); //FIXME
 	for(i=0; i < rep->pfn_list_length; i ++){
 
 		sprintf(pfn_str, "%lu",rep->pfn_list[i]);
@@ -1697,7 +1694,6 @@ static int malpage_xs_report(process_report_t *rep){
 		
 	}
 
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__); //FIXME
 	//Write domid
 	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_DOMID_PATH, domid_str);
 
@@ -1708,14 +1704,12 @@ static int malpage_xs_report(process_report_t *rep){
 	printk(KERN_ALERT "->malpage_xs_report: Finished writing to %s/%s\n",report_path,MALPAGE_XS_REPORT_READY_PATH);
 	#endif
 
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__); //FIXME
 	//Signal report is finished
 	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_READY_PATH, "1");
 
 	//Finish up
 	result = xenbus_transaction_end(*xstrans, 0);
 
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__); //FIXME
 	//Clean up
 	kfree(report_path);
 	kfree(domid_str);
@@ -1827,12 +1821,11 @@ static int malpage_report(pid_t procID, malpage_share_info_t *info) {
 	#ifdef MALPAGE_DEBUG
 	//printk(KERN_ALERT "Stopping process %d\n",procID);
 	#endif
-
-	malpage_halt_process(task);
-    /*
+	
+    //malpage_halt_process(task);
     if(!success || task->state<0){
         return -1;
-    }*/
+    }
 
 	//Generate report
 	rep = malpage_generate_report(task);
@@ -1870,21 +1863,9 @@ static int malpage_watch(pid_t procID,malpage_share_info_t *info) {
 	//gather report. notify monitor.
 	process_report_t *rep;
 
-	//int i;
-
-    /*
-	struct task_struct *task;
-
-	for_each_process(task) {
-		if ( task->pid == procID) {
-			break;
-		}
-	}*/
-
 	//Get empty report
     rep = kmalloc(sizeof(process_report_t),0);
 	rep->process_id = procID;
-	//rep->process_id = task->pid;
 	rep->domid = info->domid;
 
 	#ifdef MALPAGE_DEBUG
@@ -1994,8 +1975,10 @@ static int malpage_op_process(unsigned int op, unsigned int pid){
 static void malpage_halt_process(struct task_struct *task) {
 
 	//stop it
-	printk(KERN_ALERT "%s, Stopping %d\n.",__FUNCTION__,task->pid);
-	force_sig(SIGSTOP, task);
+    if(task->pid > 0){
+	    //printk(KERN_ALERT "%s, Stopping %d\n.",__FUNCTION__,task->pid);
+    	force_sig(SIGSTOP, task);
+    }
 
 	return;
 }
@@ -2004,7 +1987,10 @@ static void malpage_halt_process(struct task_struct *task) {
 static void malpage_resume_process(struct task_struct *task) {
 
 	//start it
-	force_sig(SIGCONT, task);
+    if(task->pid > 0){
+	    //printk(KERN_ALERT "%s, Resuming %d\n.",__FUNCTION__,task->pid);
+    	force_sig(SIGCONT, task);
+    }
 
 	return;
 }
@@ -2013,7 +1999,10 @@ static void malpage_resume_process(struct task_struct *task) {
 static void malpage_kill_process(struct task_struct *task) {
 
 	//kill it
-	force_sig(SIGKILL, task);
+    if(task->pid > 0){
+	    //printk(KERN_ALERT "%s, Killing %d\n.",__FUNCTION__,task->pid);
+	    force_sig(SIGKILL, task);
+    }
 
 	return;
 }
@@ -2027,11 +2016,11 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
 	struct response_t *resp;
     RING_IDX rc, rp;
-
+    int skip;
 	#ifdef MALPAGE_DEBUG	
 	//printk(KERN_ALERT "DomU: Handling Event\n");
 	#endif
-
+    skip = 0;
 	again:
 
 		rp = malpage_share_info->fring.sring->rsp_prod;
@@ -2052,6 +2041,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
                     process_op_pid = resp->process_id;
                     process_op_op = MALPAGE_RING_KILL;
                     up(process_op_sem);
+                    skip=1;
 					break;
 
 				case MALPAGE_RING_RESUME:
@@ -2059,6 +2049,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
                     process_op_pid = resp->process_id;
                     process_op_op = MALPAGE_RING_RESUME;
                     up(process_op_sem);
+                    skip=1;
 					break;
 
 				case MALPAGE_RING_HALT:
@@ -2066,11 +2057,13 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
                     process_op_pid = resp->process_id;
                     process_op_op = MALPAGE_RING_HALT;
                     up(process_op_sem);
+                    skip=1;
 					break;
 
 				case MALPAGE_RING_NX:
 					//printk(KERN_ALERT  "\nMalpage, Got PAUSEOP: %d,%d\n", resp->operation, resp->process_id);
                     malpage_flipnx_page(resp->mmu_ptr,resp->mmu_val);
+                    skip=1;
 					break;
 
                 case MALPAGE_RING_REPORT:
@@ -2082,25 +2075,28 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                     report_pid = (pid_t)resp->process_id;
                     up(report_sem); //Notify reporter thread
+                    skip=1;
 
 					break;
 
 				default:
-					printk(KERN_ALERT  "\nMalpage, Unrecognized operation: %d\n", resp->operation);
+					//printk(KERN_ALERT  "\nMalpage, Unrecognized operation: %d\n", resp->operation);
 					break;
 
 			}
 		}
-
-		malpage_share_info->fring.rsp_cons = rc;
-		if (rc != malpage_share_info->fring.req_prod_pvt) {
-			int notify;
-			RING_FINAL_CHECK_FOR_RESPONSES(&(malpage_share_info->fring), notify);
-			if(notify)
-				  goto again;
-		} else{
-			malpage_share_info->fring.sring->rsp_event = rc+1;
-		}
+       
+        if(!skip){
+            malpage_share_info->fring.rsp_cons = rc;
+            if (rc != malpage_share_info->fring.req_prod_pvt) {
+                int notify;
+                RING_FINAL_CHECK_FOR_RESPONSES(&(malpage_share_info->fring), notify);
+                if(notify)
+                      goto again;
+            } else{
+                malpage_share_info->fring.sring->rsp_event = rc+1;
+            }
+        }
 
 		return IRQ_HANDLED;
 

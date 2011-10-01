@@ -221,7 +221,7 @@ def watch_domain_report(path, xs):
 
         print "looking for searchstring"
         op = MONITOR_RESUME
-        search_str = "test"
+        search_str = "This is a test"
         index = 1096
         f1 = open(MONITOR_DEVICE,"rb")
         new_chunk = f1.read(index)
@@ -249,7 +249,6 @@ def watch_domain_report(path, xs):
         print "Sending process cmd:"+str(op)
         ops.doMonitorOp(op, procStruct)
         ops.close()
-        print "GOT:"+str(sys._getframe().f_lineno) #FIXME
         #remove watch
         #return False
         return True

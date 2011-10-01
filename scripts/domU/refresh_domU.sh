@@ -11,6 +11,8 @@ $PROJ_ROOT/domU/c_target_sample/sample_proc \
 $PROJ_ROOT/domU/c_target_sample/sample_proc_p \
 $PROJ_ROOT/domU/c_target_sample2/runme \
 $PROJ_ROOT/domU/c_target_sample2/runme_p \
+$PROJ_ROOT/domU/c_target_sample2/runme2 \
+$PROJ_ROOT/domU/c_target_sample2/runme2_p \
 $PROJ_ROOT/domU/c_loader/loader \
 $PROJ_ROOT/domU/python_client/main.py" .
 sh load_domU.sh
