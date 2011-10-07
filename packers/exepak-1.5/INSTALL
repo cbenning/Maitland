@@ -1,0 +1,15 @@
+
+EXEPAK can be simply compiled by typing 'make.'
+
+After you have built the main exepak binary, you don't need to keep any of
+the other files around for it to work properly.
+
+Note to Linux rootdisk makers: EXEPAK may be extremely useful in helping the
+creators of Linux distributions pack more useful utilities onto rootdisks.
+However, if you use exepak for a rootdisk and not using the asm stub
+(unlikely), be sure the exepak you use has it's stub linked against
+whatever flavour of libc you use on the rootdisk if you use some kind of
+special libc.  Many rootdisks use 'lite' variants of libc that take up less
+space but are not compatible with the standard version of libc.  If you use
+the normal libc, don't worry about it. Also be sure your rootdisk creates a
+/tmp directory big enough somewhere (like a tmpfs).

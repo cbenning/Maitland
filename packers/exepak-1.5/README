@@ -1,0 +1,83 @@
+                                EXEPAK
+(c)1997 Adam Ierymenko
+(c)2004 Stefan Talpalaru [stefantalpalaru@yahoo.com]
+
+Why use EXEPAK when UPX does such a great job at compressing a wide variety
+of executable formats?
+
+You may have your own reasons, here is mine: UPX compressed dynamicly linked
+binaries don't work with the uClibc dynamic linker. After failing to fix
+either UPX or uClibc I stumbled upon this abandoned project that used LZO
+and a big C language stub. After replacing the compression library with UCL,
+writing an assembler stub (AT&T syntax - my first asm project) and some
+other changes, EXEPAK became quite usable. I use it to compress the binaries
+on my 2 floppies distro that uses uClibc (http://blueflops.sf.net).
+                                                           Stefan Talpalaru
+
+
+Original README with the necessary corrections follows:
+
+Remember that PKLITE program for DOS that created auto-decompressing
+compressed executables?  Well here's the equivalent for Linux.  EXEPAK
+self-decompressing executables do not require that any special libraries,
+binaries, compression programs, etc. be installed on your system.
+They only require a writable /tmp directory, the /proc filesystem, and
+libc to properly decompress and execute.  (Unlike the old gzexe program
+which requires /usr/bin/gzip and /bin/sh and a bunch of other stuff and
+is slow.)
+
+How EXEPAK works:
+
+An EXEPAK compressed binary consists of the original uncompressed binary
+compressed and appended onto the end of the EXEPAK extracting 'stub'.  The
+stub works by opening /proc/self/exe which always points to the binary file
+on disk which represents the current process, seeking beyond the stub code
+to find the compressed data, and then quickly decompressing the compressed
+executable into a file in /tmp and executing it.  About a second after
+execution, a small subprocess which was forked off by the stub removes the
+temp file and exits.  Normally, the creation and deletion of the temp file
+will not cause any disk access at all since the entire process would take
+place within the filesystem buffers.
+
+Installing EXEPAK:
+
+Run make and just put the exepak binary in /usr/bin.  No other files are
+needed.  The exepak binary does not have to be installed on a system for
+compressed binaries to work.
+
+Using EXEPAK:
+
+Execute EXEPAK with a list of filenames to compress.  It will only attempt
+to compress recognized binary files, so you can "exepak *" in a directory
+with other files and it will only compress the binaries.
+
+Description of command line switches:
+   -d :
+   -x : This causes EXEPAK to decompress any compressed binaries (1.2 does
+        not have a ^dc- switch for compressed binaries-- the exepak
+        program itself decompresses instead)  It cannot decompress
+        1.0 binaries with this switch-- use the ^dc-<filename> option
+        described in the exepak 1.0 docs to decompress 1.0 binaries.
+   -b# : This sets the blocksize in K.  Larger blocksizes will give
+          slightly better compression at the expense of more memory use
+          at the moment of decompression (not afterwords, since exepak
+          self-extracting binaries leave nothing behind in memory).
+   -t : This causes EXEPAK to just report the compressed status of all
+        the files specified on the command line.  No compression or
+        decompression is done.
+
+Comments and warnings:
+   - Compressed binaries won't work unless there is enough room in /tmp to
+     create the temporary decompressed executable.
+   - The 'ldd' program won't work on compressed binaries to tell what
+     shared libraries they are linked with.  Decompress compressed binaries
+     to check which libraries they are linked with.
+   - The binaries must be uncompressed before chmod-ing them. You may
+     compress them back after finishing. This is due to the hardcoding of
+     the file mode at compression time.
+
+EXEPAK is free software and may be distributed or modified freely.  It
+comes with ABSOLUTELY NO WARRANTY; use at your own risk.
+
+EXEPAK uses the UCL compression library by Markus F.X.J. Oberhumer.  Go
+to: http://www.oberhumer.com/ucl for more info.

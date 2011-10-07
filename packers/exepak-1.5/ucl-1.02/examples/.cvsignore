@@ -1,0 +1,6 @@
+.*
+Makefile
+*.la
+*.lo
+simple
+uclpack

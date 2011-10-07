@@ -1,0 +1,53 @@
+Mar 1 2005
+Version 1.5:
+   - fixed a compile problem with gcc-3.2.3
+   - removed an unused string
+   - the stub is 1113 bytes
+
+Feb 24 2005
+Version 1.4:
+   - fixed permission of the temp dir
+
+Jan 10 2005
+Version 1.3:
+   - instead of a temp file a temp dir is being used under "/tmp" containing
+     a file with the same name as the calling program. Useful for the
+     programs/scripts who want to know by what name they are called
+   - the random bytes needed for the directory's name are read from
+     "/dev/urandom"
+   - the proc filesystem is no longer used which gives more flexibility and
+     a bigger decompression speed.
+   - the compressed file's mode is hardcoded at compression time
+   - scripts can now be compressed
+   - the stub is 1128 bytes long
+
+Aug 9 2004
+Version 1.2:
+   - assembler stub (using gas)
+   - removed support for encryption and setuid/setgid binaries
+   - replaced LZO with UCL (better compression)
+   - simplified the build process by smartening up the makefiles ;-)
+   - using sstrip - makes the stub much smaller
+   - updated and renamed "HOW_TO_COMPILE" to "INSTALL"
+   - added -d option as an alias to -x
+   - uncompressible blocks are copied unchanged
+
+Version 1.1:
+   - Fixed a bug that caused EXEPAK to crash when testing if a binary was
+     already compressed on some systems
+   - Updated LZO to version 1.01
+   - Changed command interface to be more like a normal compression program
+   - Added -e "encryption" option
+   - Added -t option to test if files are compressed
+   - Added -x option to extract compressed executables
+   - Got rid of ^dc- option to compressed programs-- exepak binary does
+     extraction now with the -x switch
+   - Now handles setuid/setgid binaries
+   - Will not attempt to compress non-executable files or directories
+   - Will not attempt to compress ELF shared libraries
+   - Minimum blocksize set to 16k
+   - Saves original file attributes, times, and owners
+   - Added progress meter during compression
+
+Version 1.0:
+   - First version

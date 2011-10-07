@@ -1,0 +1,29 @@
+Source: ucl
+Section: libs
+Priority: optional
+Maintainer: Robert Luberda <robert@debian.org>
+Build-Depends: debhelper (>> 4.1)
+Standards-Version: 3.6.1
+
+Package: libucl1
+Architecture: any
+Depends: ${shlibs:Depends}
+Conflicts: libucl (<= 1.01-1)
+Replaces: libucl (<= 1.01-1)
+Provides: libucl
+Description: Portable compression library - runtime
+ UCL is a portable lossless data compression library written in ANSI C,
+ implementing a number of compression algorithms that achieve an
+ excellent compression ratio while allowing *very* fast decompression.
+ Decompression requires no additional memory.
+
+Package: libucl-dev
+Section: libdevel
+Architecture: any
+Depends: libucl1 (= ${Source-Version}), libc6-dev | libc-dev
+Description: Portable compression library - development
+ UCL is a portable lossless data compression library written in ANSI C,
+ implementing a number of compression algorithms that achieve an
+ excellent compression ratio while allowing *very* fast decompression.
+ .
+ This package contains the development support files.

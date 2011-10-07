@@ -1,0 +1,6 @@
+*.debhelper
+libucl1
+libucl-dev
+tmp
+files
+*.substvars

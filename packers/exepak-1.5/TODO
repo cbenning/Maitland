@@ -1,0 +1,17 @@
+- write a decompression daemon that allows the usage of shared memory (if the
+  compressed binary is executed while another instance of it is running, exec
+  the same tmp file as the last time; keep a list of compressed binaries and
+  tmp files created; keep the tmp file until the program exits). Make this
+  execution model a compression-time option. If the daemon doesn't run, the
+  stub should fall back to the old model. The daemon could be coded in C.
+  Communication could be done trough a FIFO. The daemon could create a tmp
+  FIFO for every request and just send its name down the main FIFO; once the
+  name it's read, it would store a struct containing the comp. bin. - tmp
+  file pair and the access time for the later, then it would fork and read
+  the comp. bin. file name from the tmp FIFO, decompress it and send the
+  name of the tmp file through the tmp FIFO. If the tmp file name is not
+  read or the tmp file is not accessed (executed) in a given ammount of
+  time, delete it.
+  The comp. bin. should be compared with the ones allready opened by means
+  of filename, size and checksum and if it matches use the existing
+  uncompressed file.
