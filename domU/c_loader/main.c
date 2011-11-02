@@ -6,10 +6,14 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
+#include <sys/time.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 #define DEVICE_FILE_NAME "/dev/malpage"
 #define MALPAGE_IOC_MAGIC 250
 #define MALPAGE_WATCH MALPAGE_IOC_MAGIC+10
+#define ONE_MILLION 1000000
 
 int main( int argc, char* argv[] ){
 
@@ -17,13 +21,25 @@ int main( int argc, char* argv[] ){
     pid_t pid;
     char *command;
     int status;
+	struct timeval *start_time,*end_time;
+    unsigned long elapsed_sec,elapsed_usec;
+	int test_mode;
+    int shmkey,shmid;
+    void *shmarea;
+    shmkey = 1234;
 
 	if(argc < 2){
 		printf("Not enough parameters\n");
 		return -1;
 	}
-
-    command = argv[1];
+	
+	test_mode = 0;
+	command = argv[1];
+	if(argc = 3 && strcmp(argv[1],"test")==0){
+		test_mode = 1;
+		command = argv[2];
+		printf("Test Mode Enabled\n");
+	}
 
    	file_desc = open(DEVICE_FILE_NAME,O_RDWR);
 	if (file_desc < 0) {
@@ -36,36 +52,86 @@ int main( int argc, char* argv[] ){
 		printf("Unable to create child process, exiting.\n");
 		return -1;
 	}
+
 	//If fork was successful
 	else{
+
+        //start_time = calloc(sizeof(struct timeval),1);
+        end_time = calloc(sizeof(struct timeval),1);
+
 		//If current thread is the child
 		if (pid == 0){
 
             if((pid = getpid()) <0){
-                printf("Unable to determine my PID");
+                printf("Unable to determine my PID\n");
                 return -1;
             }
 
             //run watch
-			ret_val = ioctl(file_desc, MALPAGE_WATCH, pid);
-			if (ret_val < 0) {
-				printf("ioctl_msg MALPAGE_WATCH failed\n");
+			if(!test_mode){
+				ret_val = ioctl(file_desc, MALPAGE_WATCH, pid);
+				if (ret_val < 0) {
+					printf("ioctl_msg MALPAGE_WATCH failed\n");
+				}
 			}
+			else{
+				printf("Test Mode Enabled, not setting watch\n");
+			}
+
+            if((shmid = shmget(shmkey, sizeof(struct timeval), IPC_CREAT | 0666)) < 0) {
+                perror("shmget");
+                exit(1);
+            }
+
+            if((shmarea = shmat(shmid, NULL, 0)) == (char *) -1) {
+                perror("shmat");
+                exit(1);
+            }
+            start_time = (struct timeval*)shmarea;
 
             sleep(3);
 
             //run the program
-		    ret_val = execvp(command,&argv[2]);
-			
+			gettimeofday(start_time,NULL);
+			printf("Start Time: %lu, %lu\n",start_time->tv_sec,start_time->tv_usec);
+            if(test_mode){
+    		    ret_val = execvp(command,&argv[3]);
+            }
+            else{
+    		    ret_val = execvp(command,&argv[2]);
+            }
+
 			if(ret_val < 0){
 				printf("%s\n",strerror(errno));
 			}
-
 		    return 0;
 		}
 		//If current thread is the parent
 		else{
-		      wait(&status);
+		    wait(&status);
+			gettimeofday(end_time,NULL);
+
+            if((shmid = shmget(shmkey, sizeof(struct timeval), IPC_CREAT | 0666)) < 0) {
+                perror("shmget");
+                exit(1);
+            }
+
+            if((shmarea = shmat(shmid, NULL, 0)) == (char *) -1) {
+                perror("shmat");
+                exit(1);
+            }
+            start_time = (struct timeval*)shmarea;
+
+            elapsed_sec = end_time->tv_sec - start_time->tv_sec;
+            elapsed_usec = end_time->tv_usec - start_time->tv_usec;
+            if(elapsed_usec < 0){
+                elapsed_sec-=1;
+                elapsed_usec = ONE_MILLION-elapsed_usec;
+            }
+			printf("Str Time: %lu, %lu\n",start_time->tv_sec,start_time->tv_usec);
+			printf("End Time: %lu, %lu\n",end_time->tv_sec,end_time->tv_usec);
+			printf("Elapsed Time: %lu, %lu\n",elapsed_sec,elapsed_usec);
+
 		}
 	}
 

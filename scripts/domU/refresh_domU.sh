@@ -12,6 +12,11 @@ $PROJ_ROOT/domU/c_target_sample/sample_proc_p \
 $PROJ_ROOT/domU/c_target_sample2/runme2 \
 $PROJ_ROOT/domU/c_target_sample2/runme2_upx \
 $PROJ_ROOT/domU/c_target_sample2/runme2_gzexe \
+$PROJ_ROOT/domU/openssl/openssl \
+$PROJ_ROOT/domU/openssl/openssl_upx \
+$PROJ_ROOT/domU/openssl/openssl_gzexe \
 $PROJ_ROOT/domU/c_loader/loader \
+$PROJ_ROOT/benchmark/bench_gzip.sh \
 $PROJ_ROOT/domU/python_client/main.py" .
-sh load_domU.sh
+#sh load_domU.sh
+#$PROJ_ROOT/benchmark/100MB.dat \
