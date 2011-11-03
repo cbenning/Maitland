@@ -126,7 +126,7 @@ int main( int argc, char* argv[] ){
             elapsed_usec = end_time->tv_usec - start_time->tv_usec;
             if(elapsed_usec < 0){
                 elapsed_sec-=1;
-                elapsed_usec = ONE_MILLION-elapsed_usec;
+                elapsed_usec = ONE_MILLION+elapsed_usec;
             }
 			printf("Str Time: %lu, %lu\n",start_time->tv_sec,start_time->tv_usec);
 			printf("End Time: %lu, %lu\n",end_time->tv_sec,end_time->tv_usec);
