@@ -1,3 +1,5 @@
+
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +17,7 @@
 #define MALPAGE_WATCH MALPAGE_IOC_MAGIC+10
 #define ONE_MILLION 1000000
 #define IRQ_SCRIPT "/root/getsoftirqs.sh"
+#define LOGFILE_PREFIX "/root"
 
 int main( int argc, char* argv[] ){
 
@@ -23,16 +26,18 @@ int main( int argc, char* argv[] ){
     char *command;
     int status;
 	struct timeval *start_time,*end_time;
-    unsigned long elapsed_sec,elapsed_usec;
+    long elapsed_sec,elapsed_usec;
 	int test_mode;
     int shmkey,shmkey2,shmid;
-    int start_irqs,end_irqs,total_irqs;
+    long start_irqs,end_irqs,total_irqs;
     void *shmarea;
     shmkey = 1234;
     shmkey2 = 1235;
     FILE *fp;
+    FILE *file;
     char *start_irqs_str;
     char *end_irqs_str;
+    char *logfile;
 
     //cwd = calloc(1024,1);
     //getcwd(cwd,1024);
@@ -44,7 +49,7 @@ int main( int argc, char* argv[] ){
 	
 	test_mode = 0;
 	command = argv[1];
-	if(argc = 3 && strcmp(argv[1],"test")==0){
+	if(argc >= 3 && strcmp(argv[1],"test")==0){
 		test_mode = 1;
 		command = argv[2];
 		printf("Test Mode Enabled\n");
@@ -107,9 +112,7 @@ int main( int argc, char* argv[] ){
             }
 
             start_irqs_str = (char*)shmarea;
-            if(!test_mode){
-                sleep(3);
-            }
+            sleep(3);
 
             /* Open the command for reading. */
             fp = popen(IRQ_SCRIPT, "r");
@@ -175,8 +178,14 @@ int main( int argc, char* argv[] ){
 
 			//printf("Str Time: %lu, %lu\n",start_time->tv_sec,start_time->tv_usec);
 			//printf("End Time: %lu, %lu\n",end_time->tv_sec,end_time->tv_usec);
-			printf("%u %lu.%06lu\n",total_irqs,elapsed_sec,elapsed_usec);
+			printf("%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
 
+
+            logfile = NULL;
+            asprintf(&logfile, "/root/data_%s", command+2);
+            file = fopen(logfile,"a+");
+			fprintf(file,"%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
+            fclose(file);
 
 		}
 	}
