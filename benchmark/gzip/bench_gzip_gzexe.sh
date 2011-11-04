@@ -1,4 +1,4 @@
-#!/bin/s
+#!/bin/sh
 
 start=`cat /proc/stat | grep softir | cut -f2 -d" "`
 stime=`./gettime`
@@ -34,8 +34,9 @@ if [ "$eusec" -lt 0 ]
     eusec=$((1000000+eusec))
 fi
 
+eusec=`printf "%06d" $eusec`
 echo $irqs
-echo $esec
-echo $eusec
+echo "${esec}.${eusec}"
+#echo $eusec
 
 

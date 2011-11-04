@@ -21,11 +21,9 @@ int main( int argc, const char* argv[] ){
 	empty_var = calloc(NUMPAGES,PAGESIZE);
 
 	for(i=0; i < NUMPAGES; i++){
-
 		tmp = i*i;
 		sprintf(buf,"This is not a test:%d\n",(int)time(NULL));
 		strcpy(empty_var+i*PAGESIZE,buf);
-
 	}
     
 	while(1){

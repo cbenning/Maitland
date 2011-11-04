@@ -15,6 +15,7 @@ $PROJ_ROOT/benchmark/pi/pi_css5* \
 $PROJ_ROOT/benchmark/gzip/bench_* \
 $PROJ_ROOT/benchmark/gzip/gzip* \
 $PROJ_ROOT/benchmark/gettime \
+$PROJ_ROOT/benchmark/getsoftirqs.sh \
 $PROJ_ROOT/domU/c_loader/loader \
 $PROJ_ROOT/domU/python_client/main.py" .
 #sh load_domU.sh
