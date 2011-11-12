@@ -21,7 +21,6 @@
  869     XSPY_METH(get_domain_path,   METH_VARARGS),
 '''
 
-
 #Driver
 MONITOR_DEVICE_NAME = "monitor"
 MONITOR_XS_REGISTER_PATH = "/malpage/register"
@@ -50,7 +49,7 @@ MONITOR_DONE_REPORT = MONITOR_IOC_MAGIC+14
 MONITOR_MIN_DOMID = 1
 MONITOR_MAX_DOMID = 255
 
-import fcntl, os, sys, time, struct, commands, array, shutil
+import fcntl, os, sys, time, struct, commands, array, shutil, binascii
 sys.path.append("/usr/lib/xen-4.0/lib/python/")
 from xen.xend.xenstore.xsutil import *
 from xen.xend.xenstore.xswatch import *
@@ -201,7 +200,7 @@ def watch_domain_report(path, xs):
         ops.doMonitorOp(MONITOR_REPORT, procStruct)
         ops.close()
 
-        ''' 
+        '''
         print "Dumping memory"
         f1 = open(MONITOR_DEVICE,"rb")
         filename = MONITOR_DUMP_DIR+""+str(pid)+"_dump.bin"
@@ -217,12 +216,13 @@ def watch_domain_report(path, xs):
         
         f1.close()
         f2.close()
-        '''
+        ''' 
 
         print "looking for searchstring"
         op = MONITOR_RESUME
-        search_str = "This is a test"
-        index = 1096
+        search_str = "Calculation of PI using FFT and AGM, %s" ##pi_css5
+        #search_str = "This is a test"
+        index = 1024
         f1 = open(MONITOR_DEVICE,"rb")
         new_chunk = f1.read(index)
         str1 = ''
@@ -231,13 +231,14 @@ def watch_domain_report(path, xs):
             str1 = str2
             str2 = new_chunk
             combined = str(str1+str2)
-            if(str.find(combined,search_str)>=0):
+            #print combined
+            if(str.find(combined,search_str)!=-1):
                 print "Found searchstring"
                 op = MONITOR_KILL
                 break
             f1.seek(index)
             index += index
-            new_chunk = f1.read(1096)
+            new_chunk = f1.read(1024)
         f1.close()
 
 

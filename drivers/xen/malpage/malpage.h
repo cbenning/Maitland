@@ -216,6 +216,7 @@ process_report_node_t *report_list;
 static struct semaphore* report_sem;
 static pid_t report_pid;
 static int report_running = 1;
+static int report_in_progress = 0;
 static struct task_struct* reporter;
 
 static struct semaphore* process_op_sem;

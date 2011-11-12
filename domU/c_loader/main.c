@@ -183,8 +183,8 @@ int main( int argc, char* argv[] ){
 
             logfile = NULL;
             asprintf(&logfile, "/root/data_%s", command+2);
-            file = fopen(logfile,"a+");
-			fprintf(file,"%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
+            file = fopen(logfile,"w");
+		fprintf(file,"%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
             fclose(file);
 
 		}
