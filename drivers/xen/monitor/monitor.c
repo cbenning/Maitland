@@ -682,7 +682,7 @@ static int monitor_check_page_fault(unsigned int domid, unsigned int process_id,
 	unsigned long proc_cursor;
 
     
-	printk(KERN_ALERT "%s, Searching for %d: %d\n.",__FUNCTION__,domid,process_id);
+	//printk(KERN_ALERT "%s, Searching for %d: %d\n.",__FUNCTION__,domid,process_id);
 
 	dom_cursor = monitor_dom_list[domid];
 	if(!dom_cursor){

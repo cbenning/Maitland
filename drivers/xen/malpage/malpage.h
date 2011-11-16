@@ -223,8 +223,8 @@ static struct semaphore* process_op_sem;
 static unsigned int process_op_pid;
 static unsigned int process_op_op;
 static int process_op_running = 1;
+static int process_op_in_progress = 0;
 static struct task_struct* process_oper;
-
 
 
 /************************************************************************
