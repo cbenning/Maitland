@@ -415,9 +415,6 @@ static int malpage_do_page_fault(struct task_struct *task, unsigned long address
 
 	struct request_t *ring_req;
     
-    //BAILOUT
-    return 0;
-
     if (error_code & MALPAGE_PF_INSTR && error_code & MALPAGE_PF_USER && !(error_code & MALPAGE_PF_PROT)){ //If it was caused bu NX flag violation
         
         //printk(KERN_ALERT "%s: Executing NX flagged page\n",__FUNCTION__);
@@ -492,21 +489,6 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#ifdef MALPAGE_DEBUG
 			printk(KERN_ALERT "Testing\n");
 			#endif
-            /*
-			//Get task_struct for given pid
-			for_each_process(task) {
-				if ( task->pid == procID) {
-					break;
-				}
-			}
-
-			#ifdef MALPAGE_DEBUG
-			printk(KERN_ALERT "Stopping process %d\n",procID);
-			#endif
-
-			malpage_halt_process(task);
-			pfnlist_vmarea(task,0,0);
-            */
 			return 0;
 		break;
 		default:
@@ -1824,6 +1806,7 @@ static int malpage_xs_watch(process_report_t *rep){
 
 	//Clean up
     
+    //These seem to ruin lots of stuff
 	//kfree(report_path);
 	//kfree(domid_str);
 	//kfree(pid_str);
@@ -2063,48 +2046,34 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 					break;
 
 				case MALPAGE_RING_KILL:
-                    //BAILOUT
-                    skip=1;
-                    break;
-                    if(!process_op_in_progress){
-    					printk(KERN_ALERT  "\nMalpage, Got KILLOP: %d,%d\n", resp->operation, resp->process_id);
-                        process_op_pid = resp->process_id;
-                        process_op_op = MALPAGE_RING_KILL;
-                        up(process_op_sem);
-                    }
+
+                    printk(KERN_ALERT  "\nMalpage, Got KILLOP: %d,%d\n", resp->operation, resp->process_id);
+                    process_op_pid = resp->process_id;
+                    process_op_op = MALPAGE_RING_KILL;
+                    up(process_op_sem);
                     skip=1;
 					break;
 
 				case MALPAGE_RING_RESUME:
-                    //BAILOUT
-                    skip=1;
-                    break;
-                    if(!process_op_in_progress){
-                        printk(KERN_ALERT  "\nMalpage, Got RESUMEOP: %d,%d\n", resp->operation, resp->process_id);
-                        process_op_pid = resp->process_id;
-                        process_op_op = MALPAGE_RING_RESUME;
-                        up(process_op_sem);
-                    }
+
+                    printk(KERN_ALERT  "\nMalpage, Got RESUMEOP: %d,%d\n", resp->operation, resp->process_id);
+                    process_op_pid = resp->process_id;
+                    process_op_op = MALPAGE_RING_RESUME;
+                    up(process_op_sem);
                     skip=1;
 					break;
 
 				case MALPAGE_RING_HALT:
-                    //BAILOUT
-                    skip=1;
-                    break;
-                    if(!process_op_in_progress){
-                        printk(KERN_ALERT  "\nMalpage, Got PAUSEOP: %d,%d\n", resp->operation, resp->process_id);
-                        process_op_pid = resp->process_id;
-                        process_op_op = MALPAGE_RING_HALT;
-                        up(process_op_sem);
-                    }
+
+                    printk(KERN_ALERT  "\nMalpage, Got PAUSEOP: %d,%d\n", resp->operation, resp->process_id);
+                    process_op_pid = resp->process_id;
+                    process_op_op = MALPAGE_RING_HALT;
+                    up(process_op_sem);
                     skip=1;
 					break;
 
 				case MALPAGE_RING_NX:
-                    //BAILOUT
-                    skip=1;
-                    break;
+
 					//printk(KERN_ALERT  "\nMalpage, Got PAUSEOP: %d,%d\n", resp->operation, resp->process_id);
                     malpage_flipnx_page(resp->mmu_ptr,resp->mmu_val);
                     skip=1;
@@ -2112,20 +2081,14 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                 case MALPAGE_RING_REPORT:
 
-                    //BAILOUT
-                    skip=1;
-                    break;
-
-                    if(!report_in_progress){
 					printk(KERN_ALERT  "\nMalpage, Got REPORTOP: %d\n", resp->operation);
 
                     #ifdef MALPAGE_DEBUG
                     printk(KERN_ALERT "Reporting %u\n",resp->process_id);
                     #endif
                    
-                        report_pid = (pid_t)resp->process_id;
-                        up(report_sem); //Notify reporter thread
-                    }                
+                    report_pid = (pid_t)resp->process_id;
+                    up(report_sem); //Notify reporter thread
                     skip=1;
 
 					break;

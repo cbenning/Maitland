@@ -508,7 +508,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					}
 					break;
 				default:
-					printk(KERN_ALERT "\nMonitor, Unrecognized operation: %u", req.operation);
+					//printk(KERN_ALERT "\nMonitor, Unrecognized operation: %u", req.operation);
 					break;
 					  
 			}
