@@ -144,16 +144,16 @@ static int malpage_init(void) {
     sema_init(report_sem,0);
     process_op_sem = malpage_kzalloc(sizeof(struct semaphore));
     sema_init(process_op_sem,0);
-/*
+
     reporter = kthread_create(malpage_report_thread,NULL,"reporter");
     process_oper = kthread_create(malpage_process_op_thread,NULL,"oper");
     wake_up_process(reporter);
 	printk(KERN_ALERT ">malpage_init: Spawning report thread\n");
     wake_up_process(process_oper);
 	printk(KERN_ALERT ">malpage_init: Spawning process op thread\n");
-*/
 
 	//DANGEROUS, set the kernel mmu update intercept pointer
+    
 	printk(KERN_ALERT ">malpage_init: setting mmu_update ptr.\n");
 	kmalpage_mmu_update = &malpage_mmu_update;
 	if(kmalpage_mmu_update==NULL){
@@ -327,11 +327,9 @@ static int malpage_multi_mmu_update(pte_t *ptep, pte_t pte){
 
                 spin_lock(&malpage_mmu_info_lock);
                 tmp_pid = current_thread_info()->task->pid;
-                printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 
                 // Write a request into the ring and update the req-prod pointer
                 ring_req = RING_GET_REQUEST(&(malpage_share_info->fring), malpage_share_info->fring.req_prod_pvt);
-                printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
                 ring_req->operation = MALPAGE_RING_MMUUPDATE;
                 malpage_share_info->fring.req_prod_pvt += 1;
 
@@ -343,10 +341,8 @@ static int malpage_multi_mmu_update(pte_t *ptep, pte_t pte){
                 // Send a reqest to backend followed by an int if needed
                 //RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&(malpage_share_info->fring), notify); 
                 RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
-                printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
                 notify_remote_via_irq(malpage_share_info->irq);
  
-                printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
                 //RING_PUSH_REQUESTS(&(malpage_share_info->fring)); 
                 spin_unlock(&malpage_mmu_info_lock);
 
@@ -354,7 +350,6 @@ static int malpage_multi_mmu_update(pte_t *ptep, pte_t pte){
         //printk(KERN_ALERT "Done\n");
     }
 
-    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 	return 0;
 }
 
@@ -489,8 +484,10 @@ static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#ifdef MALPAGE_DEBUG
 			printk(KERN_ALERT "Watching Process\n");
 			#endif
-			return malpage_watch(procID,malpage_share_info);
 
+			malpage_watch(procID,malpage_share_info);
+
+            return 0;
 		case MALPAGE_TEST:
 			#ifdef MALPAGE_DEBUG
 			printk(KERN_ALERT "Testing\n");
@@ -1024,9 +1021,7 @@ static void* malpage_kzalloc(size_t size){
     int extra;
     void* ptr;
     extra = 8;
-    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
     ptr = kzalloc(size+extra,GFP_KERNEL);
-    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
     ptr += extra/2;
     return ptr;
 
@@ -1824,17 +1819,16 @@ static int malpage_xs_watch(process_report_t *rep){
 
 	//Signal report is finished
 	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_READY_PATH, "1");
-
-	//Finish up
     result = xenbus_transaction_end(*xstrans, 0);
 	printk(KERN_ALERT "->malpage_xs_watch: End Transaction: %d\n",result);
 
 	//Clean up
-	kfree(report_path);
-	kfree(domid_str);
-	kfree(pid_str);
-	kfree(xstrans);
-
+    
+	//kfree(report_path);
+	//kfree(domid_str);
+	//kfree(pid_str);
+	//kfree(xstrans);
+    
 	return 0;
 }
 
@@ -1898,21 +1892,21 @@ static int malpage_report(pid_t procID, malpage_share_info_t *info) {
 static int malpage_watch(pid_t procID,malpage_share_info_t *info) {
 
 	//gather report. notify monitor.
-	process_report_t *rep;
+	process_report_t rep;
 
 	//Get empty report
-    rep = malpage_kzalloc(sizeof(process_report_t));
-	rep->process_id = procID;
-	rep->domid = info->domid;
+    //rep = malpage_kzalloc(sizeof(process_report_t));
+	rep.process_id = procID;
+	rep.domid = info->domid;
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "DomU: Watch Report Generated:\n");
-	printk(KERN_ALERT "	process_id: %u\n",rep->process_id);
-	printk(KERN_ALERT "	domid: %u\n",rep->domid);
+	printk(KERN_ALERT "	process_id: %u\n",rep.process_id);
+	printk(KERN_ALERT "	domid: %u\n",rep.domid);
 	printk(KERN_ALERT "Storing watch report in XS\n");
 	#endif
 
-	malpage_xs_watch(rep);
+	malpage_xs_watch(&rep);
 
 	return 0;
 }

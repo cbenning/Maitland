@@ -284,14 +284,9 @@ def watch_domain_watchreport(path, xs):
         domid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_DOMID_PATH))
         pid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_PID_PATH))
         
-        xs.transaction_end(th)
-        
-        
-        #print "Received "+str(count)+" pfns, now removing watchreport"
-        
+        print "Received "+str(count)+" pfns, now removing watchreport"
         
         #Nuke the report 
-        th = xs.transaction_start()    
         xs.rm(th, reg_path)
         xs.transaction_end(th)    
         
@@ -303,7 +298,7 @@ def watch_domain_watchreport(path, xs):
         
         ops = Monitor(MONITOR_DEVICE)
         #procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],pfnArr.buffer_info()[0],count)
-        procStruct = struct.pack("III",pid,domid,0,)
+        procStruct = struct.pack("III",pid,domid,0)
         ops.doMonitorOp(MONITOR_WATCH, procStruct)
         ops.close()
         
