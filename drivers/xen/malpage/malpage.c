@@ -140,17 +140,14 @@ static int malpage_init(void) {
 	malpage_mmu_info_lock = SPIN_LOCK_UNLOCKED; //Initialize the lock
 
     //Report Semaphore for sleeper thread
-    report_sem = malpage_kzalloc(sizeof(struct semaphore));
-    sema_init(report_sem,0);
-    process_op_sem = malpage_kzalloc(sizeof(struct semaphore));
-    sema_init(process_op_sem,0);
+    vars_lock = SPIN_LOCK_UNLOCKED;
+    thread_lock_sem = kzalloc(sizeof(struct semaphore),0);
+    sema_init(thread_lock_sem,0);
+    need_response = kzalloc(4,0); 
 
     reporter = kthread_create(malpage_report_thread,NULL,"reporter");
-    process_oper = kthread_create(malpage_process_op_thread,NULL,"oper");
     wake_up_process(reporter);
 	printk(KERN_ALERT ">malpage_init: Spawning report thread\n");
-    wake_up_process(process_oper);
-	printk(KERN_ALERT ">malpage_init: Spawning process op thread\n");
 
 	//DANGEROUS, set the kernel mmu update intercept pointer
     
@@ -203,23 +200,31 @@ static int malpage_report_thread(void* args){
 
     printk(KERN_ALERT "report thread spawned");
     while(report_running){
-        report_in_progress = 0;
-        down_interruptible(report_sem); //Wait until I am notified and should go again
-        report_in_progress = 1;
-        malpage_report(report_pid,malpage_share_info);
-    }
-    return 0;
-}
 
+        printk(KERN_ALERT "%s: %d: SemVal: %d\n",__func__,__LINE__,thread_lock_sem->count);
+        down_interruptible(thread_lock_sem); //Wait until I am notified and should go again
+        //CRIT SECTION
 
-static int malpage_process_op_thread(void* args){
+        printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
+        switch(thread_op){
 
-    printk(KERN_ALERT "process op thread spawned");
-    while(process_op_running){
-        process_op_in_progress = 0;
-        down_interruptible(process_op_sem); //Wait until I am notified and should go again
-        process_op_in_progress = 1;
-        malpage_op_process(process_op_op,process_op_pid);
+            case 1:
+                malpage_op_process(process_op_op,process_op_pid);
+                clear_bit(0,need_response);
+            break;
+
+            case 2:
+                set_bit(0,need_response);
+                //malpage_op_process(MALPAGE_RING_HALT,report_pid);
+                malpage_report(report_pid,malpage_share_info);
+            break;
+
+            default:
+            break;
+        }
+        //CRIT SECTION
+        spin_unlock(&vars_lock);
+
     }
     return 0;
 }
@@ -608,7 +613,7 @@ static int free_pfn_ll(pfn_ll_node *root){
 	int count;	
 	#endif
 	
-	pfn_ll_node *front;
+	pfn_ll_node *front, *tmp;
 	front = root;
 	
 	#ifdef MALPAGE_DEBUG
@@ -621,8 +626,9 @@ static int free_pfn_ll(pfn_ll_node *root){
 	
 	while(front){
 	
-		kfree(front);
-		front = front->next;
+		tmp = front;
+        front = front->next;
+		kfree(tmp); //BREAKS occasionally
 		
 		#ifdef MALPAGE_DEBUG
 		count++;
@@ -1578,7 +1584,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 
 	//Make the pfn list
 	//tmp_root = pfnlist(task, 1);
-	tmp_root = pfnlist_vmarea(task,0, 0);
+	tmp_root = pfnlist_vmarea(task,1, 0);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "Calculating number of pfns.\n");
@@ -1592,7 +1598,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 	#endif
 
 	rep->pfn_list = pfnlist_mkarray(tmp_root, rep->pfn_list_length);
-	free_pfn_ll(tmp_root); 
+	//free_pfn_ll(tmp_root); 
 	rep->gref_list = malpage_kzalloc(sizeof(unsigned int)*rep->pfn_list_length);
 
 	#ifdef MALPAGE_DEBUG
@@ -1607,20 +1613,14 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 
 static int malpage_xs_report(process_report_t *rep){
 
-	struct xenbus_transaction *xstrans;
-	char *pfn_str,*report_gref_path,*gref_str,*domid_str,*report_path, *pid_str;
+	struct xenbus_transaction xstrans;
+	char *pfn_str,*report_gref_path,*gref_str,*domid_str,*report_path,*pid_str;
 	int result;
 	int i;
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "->malpage_xs_report\n");
 	#endif
-
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
-	xstrans = malpage_kzalloc(sizeof(struct xenbus_transaction));
-    
-    result = xenbus_transaction_start(xstrans);
-	printk(KERN_ALERT "%s: GOT: %d,%d\n",__func__,__LINE__,result);
 
 	//Get a string version of the domid to use in the path
 	domid_str = malpage_kzalloc(strlen("10000"));
@@ -1632,7 +1632,6 @@ static int malpage_xs_report(process_report_t *rep){
 	//Put grefs and frame nums in XS
 	//ULONG_MAX: 18446744073709551615
 
-	//printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 	report_path = malpage_kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str));
 	if((result = sprintf(report_path, "%s/%s",MALPAGE_XS_REPORT_PATH, domid_str)) < 1){
 		#ifdef MALPAGE_DEBUG
@@ -1641,7 +1640,7 @@ static int malpage_xs_report(process_report_t *rep){
 		return MALPAGE_GENERALERR;
 	}
 
-/*
+    /*
 	report_pfn_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_FRAME_PATH),0);
 	if((result = sprintf(report_pfn_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_FRAME_PATH)) < 1){
 		#ifdef MALPAGE_DEBUG
@@ -1652,7 +1651,7 @@ static int malpage_xs_report(process_report_t *rep){
 
 	//Make gref dir
 	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_FRAME_PATH, "1");
-*/
+    */
 
 	report_gref_path = malpage_kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_GREF_PATH));
 	if((result = sprintf(report_gref_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_GREF_PATH)) < 1){
@@ -1662,72 +1661,57 @@ static int malpage_xs_report(process_report_t *rep){
 		return MALPAGE_GENERALERR;
 	}
 
-	printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
-	//Make frame dir
-	if(!xenbus_exists(*xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH)){
-	    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
-        result = xenbus_mkdir(*xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH);
-        printk(KERN_ALERT "%s:%d: mkdir: %d\n",__func__,__LINE__,result);
-    }
+	//xstrans = malpage_kzalloc(sizeof(struct xenbus_transaction));
+    result = xenbus_transaction_start(&xstrans);
 
-	//printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
+	//Make frame dir
+	//if(!xenbus_exists(*xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH)){
+    //    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
+    result = xenbus_mkdir(xstrans, report_path, MALPAGE_XS_REPORT_GREF_PATH);
+    //}
+
 	pfn_str = malpage_kzalloc(strlen("18446744073709551615"));
 	gref_str = malpage_kzalloc(strlen("100000"));
-
-	result = xenbus_transaction_end(*xstrans, 0);
 
 	for(i=0; i < rep->pfn_list_length; i ++){
 
 		sprintf(pfn_str, "%lu",rep->pfn_list[i]);
-
 		//Signal report is finished
 		//result = xenbus_write(*xstrans, report_pfn_path, pfn_str, pfn_str);
-
 		sprintf(gref_str, "%u",rep->gref_list[i]);
 
-        result = xenbus_transaction_start(xstrans);
+        //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 		//Make frame dir
-	    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
-    	if(xenbus_exists(*xstrans, report_gref_path, gref_str)){
-	        //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
-            result = xenbus_rm(*xstrans, report_gref_path, gref_str);
+    	
+        /*
+        if(xenbus_exists(*xstrans, report_gref_path, gref_str)){
+            //result = xenbus_rm(*xstrans, report_gref_path, gref_str);
         }
+        */
 
-	    //printk(KERN_ALERT "%s: %d\n",__func__,__LINE__);
-    	result = xenbus_write(*xstrans, report_gref_path, gref_str, pfn_str);
-		#ifdef MALPAGE_DEBUG
-		//printk(KERN_ALERT "	->malpage_xs_report: wrote gref %d\n",i);
-		#endif
-	    result = xenbus_transaction_end(*xstrans, 0);
-		
+    	result = xenbus_write(xstrans, report_gref_path, gref_str, pfn_str);
 	}
     
-    result = xenbus_transaction_start(xstrans);
-
-	//printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 	//Write domid
-	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_DOMID_PATH, domid_str);
+	result = xenbus_write(xstrans, report_path, MALPAGE_XS_REPORT_DOMID_PATH, domid_str);
 
-	//printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 	//write pid
-	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_PID_PATH, pid_str);
+	result = xenbus_write(xstrans, report_path, MALPAGE_XS_REPORT_PID_PATH, pid_str);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "->malpage_xs_report: Finished writing to %s/%s\n",report_path,MALPAGE_XS_REPORT_READY_PATH);
 	#endif
 
 	//Signal report is finished
-	result = xenbus_write(*xstrans, report_path, MALPAGE_XS_REPORT_READY_PATH, "1");
+	result = xenbus_write(xstrans, report_path, MALPAGE_XS_REPORT_READY_PATH, "1");
 
-	//printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 	//Finish up
-	result = xenbus_transaction_end(*xstrans, 0);
+	result = xenbus_transaction_end(xstrans, 0);
 
-	//printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 	//Clean up
-	kfree(report_path);
-	kfree(domid_str);
-	kfree(xstrans);
+	//kfree(report_path);
+	//kfree(domid_str);
+	//kfree(xstrans);
 
 	return 0;
 
@@ -2048,27 +2032,54 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 				case MALPAGE_RING_KILL:
 
                     printk(KERN_ALERT  "\nMalpage, Got KILLOP: %d,%d\n", resp->operation, resp->process_id);
-                    process_op_pid = resp->process_id;
-                    process_op_op = MALPAGE_RING_KILL;
-                    up(process_op_sem);
+                    spin_lock(&vars_lock);
+                    if(test_bit(0,need_response)){
+                        printk(KERN_ALERT  "\nMalpage, Executing KILLOP: %d,%d\n", resp->operation, resp->process_id);
+                        //CRIT SECTION
+                        thread_op = 1;
+                        process_op_pid = resp->process_id;
+                        process_op_op = MALPAGE_RING_KILL;
+                        //CRIT SECTION
+                        up(thread_lock_sem);
+                    }
+                    else{
+                        spin_unlock(&vars_lock);
+                    }
                     skip=1;
 					break;
 
 				case MALPAGE_RING_RESUME:
 
-                    printk(KERN_ALERT  "\nMalpage, Got RESUMEOP: %d,%d\n", resp->operation, resp->process_id);
-                    process_op_pid = resp->process_id;
-                    process_op_op = MALPAGE_RING_RESUME;
-                    up(process_op_sem);
+                    printk(KERN_ALERT  "\nMalpage, Got RESUMEOP: %d,%d\n", resp->operation, resp->process_id);                    
+                    spin_lock(&vars_lock);                    
+                    if(test_bit(0,need_response)){
+                        printk(KERN_ALERT  "\nMalpage, Executing RESUMEOP: %d,%d\n", resp->operation, resp->process_id);                    
+                        //CRIT SECTION
+                        thread_op = 1;
+                        process_op_pid = resp->process_id;
+                        process_op_op = MALPAGE_RING_RESUME;
+                        //CRIT SECTION
+                        up(thread_lock_sem);
+                    }
+                    else{
+                        spin_unlock(&vars_lock);
+                    }
                     skip=1;
 					break;
 
 				case MALPAGE_RING_HALT:
 
+                    /*
+                    while(test_and_set_bit(0,vars_lock)!=0){} //Spinlock
+
                     printk(KERN_ALERT  "\nMalpage, Got PAUSEOP: %d,%d\n", resp->operation, resp->process_id);
+                    //CRIT SECTION
+                    thread_op = 1;
                     process_op_pid = resp->process_id;
                     process_op_op = MALPAGE_RING_HALT;
-                    up(process_op_sem);
+                    //CRIT SECTION
+                    up(&thread_lock_sem);
+                    */
                     skip=1;
 					break;
 
@@ -2081,16 +2092,23 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                 case MALPAGE_RING_REPORT:
 
-					printk(KERN_ALERT  "\nMalpage, Got REPORTOP: %d\n", resp->operation);
+                    printk(KERN_ALERT  "\nMalpage, Got REPORTOP: %d, %u\n", resp->operation,resp->process_id);
+                    if(spin_trylock(&vars_lock)){
+                        if(test_bit(0,need_response)){
+                            spin_unlock(&vars_lock);
+                            skip=1;
+                            break;
+                        }
+                        printk(KERN_ALERT  "\nMalpage, Executing REPORTOP: %d, %u\n", resp->operation,resp->process_id);
+                        //CRIT SECTION
+                        thread_op = 2;
+                        report_pid = (pid_t)resp->process_id;
+                        malpage_op_process(MALPAGE_RING_HALT,report_pid);
+                        //CRIT SECTION
+                        up(thread_lock_sem);
+                    }
 
-                    #ifdef MALPAGE_DEBUG
-                    printk(KERN_ALERT "Reporting %u\n",resp->process_id);
-                    #endif
-                   
-                    report_pid = (pid_t)resp->process_id;
-                    up(report_sem); //Notify reporter thread
                     skip=1;
-
 					break;
 
 				default:
@@ -2120,7 +2138,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 static int malpage_flipnx_page(pte_t *ptep, pte_t pte){
 
     unsigned long pteval;
-
+    return 0;//bailout
     //printk(KERN_ALERT "Marking as Non-Exec\n");
     pte_set_flags(*ptep,_PAGE_NX);
     //printk(KERN_ALERT "Marked as Non-Exec\n");

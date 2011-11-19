@@ -136,7 +136,6 @@ def watch_domain_register(path, xs):
 
         #remove the watch
         return False
-        
     
     return True
 
@@ -152,11 +151,10 @@ def watch_domain_report(path, xs):
         
         reg_path=path.rsplit("/",1)[0]
         print "Report found at:"+reg_path
-        
+
         th = xs.transaction_start()    
         dirs = xs.ls(th, reg_path+MONITOR_XS_REPORT_GREF_PATH)
         xs.transaction_end(th)
-        
 
         grefs = []
         pfns = []
@@ -182,7 +180,7 @@ def watch_domain_report(path, xs):
         dirs = xs.ls(th, reg_path)
         for dir in dirs:
             print "removing: "+str(reg_path)+"/"+str(dir)
-            xs.rm(th,reg_path+"/"+dir)
+            xs.rm(th,reg_path+"/"+str(dir))
         xs.transaction_end(th)    
         
         print "Sending report to Monitor module..."       
@@ -220,7 +218,7 @@ def watch_domain_report(path, xs):
 
         print "looking for searchstring"
         op = MONITOR_RESUME
-        search_str = "Calculation of PI using FFT and AGM, %s" ##pi_css5
+        search_str = "Calculation of PI using FFT and AGM" ##pi_css5
         #search_str = "This is a test"
         index = 1024
         f1 = open(MONITOR_DEVICE,"rb")
@@ -283,10 +281,10 @@ def watch_domain_watchreport(path, xs):
         
         domid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_DOMID_PATH))
         pid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_PID_PATH))
-        
-        print "Received "+str(count)+" pfns, now removing watchreport"
-        
+        xs.transaction_end(th)    
+
         #Nuke the report 
+        th = xs.transaction_start()    
         xs.rm(th, reg_path)
         xs.transaction_end(th)    
         

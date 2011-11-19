@@ -464,10 +464,11 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
 				case MONITOR_RING_REPORT :
 
-				    	printk(KERN_ALERT "\nMonitor, Got MONITOR_RING_REPORT op: %u", req.operation);
-    					resp.operation = monitor_report(&(req.report));
-    					resp.report = req.report;
+				    	//printk(KERN_ALERT "\nMonitor, Got MONITOR_RING_REPORT op: %u", req.operation);
+    					//resp.operation = monitor_report(&(req.report));
+    					//resp.report = req.report;
 
+                    resp.operation = MONITOR_RING_NONOP;
 					break;
 
 				case MONITOR_RING_MMUUPDATE:	
@@ -484,7 +485,6 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
                             resp.mmu_val = req.mmu_val;
                             resp.operation = MONITOR_RING_NX; //request mark NX
                             //printk(KERN_ALERT "%s: Request mark page Non-Exec", __FUNCTION__);
-                            //resp.operation = MONITOR_RING_REPORT; //request report
 
                         }
 					}
@@ -494,7 +494,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 
                         //If the process is one we are watching
-						if(monitor_check_page_fault(req.domid,req.process_id,req.fault_addr)>0){
+						if(!report_in_progress && monitor_check_page_fault(req.domid,req.process_id,req.fault_addr)>0){
  
                             printk(KERN_ALERT "%s: MONITOR_RING_NXVIOLATION:%d:%u", __FUNCTION__,req.domid,req.process_id);
                             resp.process_id = req.process_id;
@@ -503,12 +503,14 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
                         }
                         else{
-                            //monitor_resume_process(req.process_id);
+                            //monitor_resume_process(req.process_id);                            
+                            resp.operation = MONITOR_RING_NONOP; 
                         }
 					}
 					break;
 				default:
 					//printk(KERN_ALERT "\nMonitor, Unrecognized operation: %u", req.operation);
+                    resp.operation = MONITOR_RING_NONOP; 
 					break;
 					  
 			}
@@ -589,9 +591,9 @@ static int monitor_watch(unsigned long arg){
 
 	unsigned long **dom_cursor;
 	unsigned long proc_cursor;
-	process_report_t *rep, *tmp_rep;
+	process_watchreport_t *rep, *tmp_rep;
 
-	tmp_rep = (process_report_t*)arg;
+	tmp_rep = (process_watchreport_t*)arg;
 	rep = kzalloc(sizeof(process_watchreport_t),GFP_KERNEL);
 	
 	rep->domid = tmp_rep->domid;

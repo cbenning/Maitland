@@ -213,19 +213,19 @@ static struct cdev malpage_cdev;
 static struct class* malpage_class;
 process_report_node_t *report_list;
 
-static struct semaphore* report_sem;
-static pid_t report_pid;
-static int report_running = 1;
-static int report_in_progress = 0;
-static struct task_struct* reporter;
+static struct semaphore *thread_lock_sem;
+static spinlock_t vars_lock;
 
-static struct semaphore* process_op_sem;
+static unsigned int thread_op; //1:process,2:report
+//Process ops
 static unsigned int process_op_pid;
 static unsigned int process_op_op;
-static int process_op_running = 1;
-static int process_op_in_progress = 0;
-static struct task_struct* process_oper;
+static void *need_response;
 
+//Report ops
+static pid_t report_pid;
+static int report_running = 1;
+static struct task_struct* reporter;
 
 /************************************************************************
 Grant table and Interdomain Variables
