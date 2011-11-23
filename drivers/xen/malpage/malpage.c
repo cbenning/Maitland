@@ -144,9 +144,9 @@ static int malpage_init(void) {
     INIT_LIST_HEAD(&report_queue.list);
 
     //Report Semaphore for sleeper thread
-    thread_report_sem = kzalloc(sizeof(struct semaphore),0);
+    thread_report_sem = kzalloc(sizeof(struct semaphore),GFP_KERNEL);
     sema_init(thread_report_sem,0);
-    thread_response_sem = kzalloc(sizeof(struct semaphore),0);
+    thread_response_sem = kzalloc(sizeof(struct semaphore),GFP_KERNEL);
     sema_init(thread_response_sem,0);
 
     reporter = kthread_create(malpage_report_thread,NULL,"reporter");
@@ -704,7 +704,7 @@ static int pfnlist_size(pfn_ll_node *root){
 
 static unsigned long* pfnlist_mkarray(pfn_ll_node *root, int length){
 
-	unsigned long *pfn_array = malpage_kzalloc(sizeof(unsigned long)*length);
+	unsigned long *pfn_array = kzalloc(sizeof(unsigned long)*length,GFP_KERNEL);
 	unsigned int count;
 
 	pfn_ll_node *front;
@@ -796,23 +796,15 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	unsigned long current_anon_vma_vm_start;
 	unsigned long current_anon_vma_vm_end;
 	long current_anon_vma_vm_length;
-	//long heap_length;
-	//long code_length;
-	//long data_length;
 
 	unsigned long new_mfn;
 	struct mm_struct *tsk_mm;
 	int vma_total;
 	int vma_count;
 	int anon_vma_count;
-	//int heap_count;
-	//int data_count;
-	//int code_count;
 	struct vm_area_struct *current_vma;
 	struct vm_area_struct *current_anon_vma;
-	//struct anon_vma *current_anon_vma;
 	int skip;
-
 
 	//Related to the linked list
 	int root_exists;
@@ -822,8 +814,6 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	pfn_ll_node *pfn_root;
 	pfn_ll_node *tmp_pfn_root;
 	pfn_ll_node *tmp_pfn;
-	//struct list_head *node;
-	//struct list_head *first_node;
 
 	//Init list
 	root_exists = 0;
@@ -840,20 +830,16 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	current_vma = tsk_mm->mmap;
 	vma_count=0;
 
-	//Take the MM lock
-	//while(mm_take_all_locks(tsk_mm)){}
-	spin_lock(&tsk_mm->page_table_lock);
 	//Decrement Semaphore
 	down_read(&tsk_mm->mmap_sem);
+	//Take the MM lock
+	spin_lock(&tsk_mm->page_table_lock);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "%s: Process memory stats, total_vm:%lu, locked_vm:%lu, shared_vm:%lu, exec_vm:%lu, stack_vm:%lu, reserved_vm:%lu\n",__func__, tsk_mm->total_vm, tsk_mm->locked_vm, tsk_mm->shared_vm, tsk_mm->exec_vm, tsk_mm->stack_vm, tsk_mm->reserved_vm);
 	#endif
 
-	//printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);
 	do{
-
-	    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 		//Get memory boundaries
 		current_vma_vm_start = current_vma_vm_end = current_vma_vm_length = 0;
 		current_vma_vm_start = current_vma->vm_start;
@@ -866,14 +852,11 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 
 		skip = 0;
 
-	    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 		//Check if this is the heap
 		if(!(current_vma->vm_flags & VM_WRITE )){
 			skip=1;
 		}
 
-
-	    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 		local_page_count=0;
 		while(current_vma_vm_length>=0 && !skip){
 			new_mfn = 0;
@@ -883,15 +866,24 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 				anon_vma_count++;
 				//Set root if we havent already
 				if(!root_exists){
-					pfn_root = malpage_kzalloc(sizeof(pfn_ll_node));
+                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+					pfn_root = kzalloc(sizeof(pfn_ll_node),GFP_ATOMIC);
+                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                    if(!pfn_root){
+                        printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                    }
 					pfn_root->pfn = new_mfn;
+                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 					pfn_root->next = NULL;
 					root_exists = 1;
 					tmp_pfn_root = pfn_root;
 				}
 				else{
-					tmp_pfn = malpage_kzalloc(sizeof(pfn_ll_node));
+                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+					tmp_pfn = kzalloc(sizeof(pfn_ll_node),GFP_ATOMIC);
+                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 					tmp_pfn->pfn = new_mfn;
+                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 					tmp_pfn->next = NULL;
 					tmp_pfn_root->next = tmp_pfn;
 					tmp_pfn_root = tmp_pfn_root->next;
@@ -920,7 +912,6 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
             //Now do anyonymous VMA's (this usually includes the heap)
             anon_vma_lock(current_vma);
             //spin_lock(&current_vma->anon_vma->lock);
-
 
             //#ifdef MALPAGE_DEBUG
             //printk(KERN_ALERT "	Looking for ANON VMA's associated with this one\n");
@@ -966,14 +957,14 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                             page_all_count++;
                             //Set root if we havent already
                             if(!root_exists){
-                                pfn_root = malpage_kzalloc(sizeof(pfn_ll_node));
+                                pfn_root = kzalloc(sizeof(pfn_ll_node),GFP_KERNEL);
                                 pfn_root->pfn = new_mfn;
                                 pfn_root->next = NULL;
                                 root_exists = 1;
                                 tmp_pfn_root = pfn_root;
                             }
                             else{
-                                tmp_pfn = malpage_kzalloc(sizeof(pfn_ll_node));
+                                tmp_pfn = kzalloc(sizeof(pfn_ll_node),GFP_KERNEL);
                                 tmp_pfn->pfn = new_mfn;
                                 tmp_pfn->next = NULL;
                                 tmp_pfn_root->next = tmp_pfn;
@@ -1010,7 +1001,6 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 
 	}while(current_vma && vma_count<vma_total);
 
-	//mm_drop_all_locks(tsk_mm);
 	spin_unlock(&tsk_mm->page_table_lock);
 	//Decrement Semaphore
 	up_read(&tsk_mm->mmap_sem);
@@ -1033,7 +1023,8 @@ static void* malpage_kzalloc(size_t size){
     int extra;
     void* ptr;
     extra = 8;
-    ptr = kzalloc(size+extra,GFP_KERNEL);
+    //ptr = kzalloc(size+extra,GFP_KERNEL);
+    ptr = kzalloc(size+extra,GFP_ATOMIC);
     ptr += extra/2;
     return ptr;
 
@@ -1217,7 +1208,7 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 
 					//Set root if we havent already
 					if(!root_exists){
-						pfn_root = malpage_kzalloc(sizeof(pfn_ll_node));
+						pfn_root = kzalloc(sizeof(pfn_ll_node),GFP_KERNEL);
 						pfn_root->pfn = tmp;
 						pfn_root->next = NULL;
 						root_exists = 1;
@@ -1225,7 +1216,7 @@ static pfn_ll_node* pfnlist(struct task_struct *task, int uniq){
 						continue;
 					}
 
-					tmp_pfn = malpage_kzalloc(sizeof(pfn_ll_node));
+					tmp_pfn = kzalloc(sizeof(pfn_ll_node),GFP_KERNEL);
 					//Assign current node to the one we just found
 					tmp_pfn->pfn = tmp;
 					tmp_pfn->next = NULL;
@@ -1322,7 +1313,7 @@ static int malpage_get_domid(void){
 	printk(KERN_ALERT "getting domid.\n");
 	#endif
 	
-	xstrans = malpage_kzalloc(sizeof(struct xenbus_transaction));
+	xstrans = kzalloc(sizeof(struct xenbus_transaction),GFP_KERNEL);
 	result = xenbus_transaction_start(xstrans);
 
 	/*
@@ -1333,6 +1324,7 @@ static int malpage_get_domid(void){
 	inside /vm, even their own, as a security precaution.
 	*/
 	tmp = xenbus_read(*xstrans, MALPAGE_XENSTORE_DOMID_PATH, "", &len);	
+	result = xenbus_transaction_end(*xstrans, 0);
 
 	if (IS_ERR(tmp)){
 		#ifdef MALPAGE_DEBUG
@@ -1345,13 +1337,14 @@ static int malpage_get_domid(void){
 	printk(KERN_ALERT "query successful\n");
 	#endif
 
-	tmp2 = malpage_kzalloc(len);
+	tmp2 = kzalloc(len,GFP_KERNEL);
 	strncpy(tmp2,(char*)tmp,len);	
 	value = simple_strtoul(tmp2,NULL,10);
 	
 	//Finish up
-	result = xenbus_transaction_end(*xstrans, 0);
 	kfree(xstrans);
+    kfree(tmp);
+    kfree(tmp2);
 	
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "got domid %d\n",value);
@@ -1377,7 +1370,7 @@ static malpage_share_info_t* malpage_register(void){
 	#endif
 
 	//Share ring
-	info = malpage_kzalloc(sizeof(malpage_share_info_t));
+	info = kzalloc(sizeof(malpage_share_info_t),GFP_KERNEL);
 	info->ring_mfn = malpage_setup_ring(info);
 
 	#ifdef MALPAGE_DEBUG
@@ -1386,12 +1379,12 @@ static malpage_share_info_t* malpage_register(void){
 	#endif
 
 	//gref = malpage_share_info->gref;
-	info->uuid = malpage_kzalloc(MALPAGE_UUID_LENGTH);
+	info->uuid = kzalloc(MALPAGE_UUID_LENGTH,GFP_KERNEL);
 	malpage_get_uuid(info->uuid);
 	info->domid = malpage_get_domid();
 
 	//Ugly hack, but why not?
-	value = malpage_kzalloc(strlen(MALPAGE_XENSTORE_REGISTER_VALUE_FORMAT)+MALPAGE_UUID_LENGTH+15);
+	value = kzalloc(strlen(MALPAGE_XENSTORE_REGISTER_VALUE_FORMAT)+MALPAGE_UUID_LENGTH+15,GFP_KERNEL);
 	if((ret = sprintf(value, MALPAGE_XENSTORE_REGISTER_VALUE_FORMAT, info->domid, info->gref , info->evtchn, info->uuid)) < 1){
 		#ifdef MALPAGE_DEBUG		
 		printk(KERN_ALERT "->malpage_register: sprintf broke: %d\n",ret);
@@ -1404,11 +1397,11 @@ static malpage_share_info_t* malpage_register(void){
 	printk(KERN_ALERT "->malpage_register:beginning registration\n");
 	#endif
 	
-	xstrans = malpage_kzalloc(sizeof(struct xenbus_transaction));
+	xstrans = kzalloc(sizeof(struct xenbus_transaction),GFP_KERNEL);
 	result = xenbus_transaction_start(xstrans);
 
 	//Get a string version of the domid to use in the path
-	domid_str = malpage_kzalloc(strlen("10000"));
+	domid_str = kzalloc(strlen("10000"),GFP_KERNEL);
 	sprintf(domid_str, "%u", info->domid);
 
 	/*
@@ -1599,7 +1592,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 	#endif
 
 	//Get empty report
-	rep = malpage_kzalloc(sizeof(process_report_t));
+	rep = kzalloc(sizeof(process_report_t),GFP_KERNEL);
 	rep->process_id = task->pid;
 
 	#ifdef MALPAGE_DEBUG
@@ -1623,7 +1616,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 
 	rep->pfn_list = pfnlist_mkarray(tmp_root, rep->pfn_list_length);
 	//free_pfn_ll(tmp_root); 
-	rep->gref_list = malpage_kzalloc(sizeof(unsigned int)*rep->pfn_list_length);
+	rep->gref_list = kzalloc(sizeof(unsigned int)*rep->pfn_list_length,GFP_KERNEL);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "Determining process age.\n");
@@ -1649,13 +1642,13 @@ static int malpage_xs_report(process_report_t *rep){
 
     retry_transaction:
 	//Get a string version of the domid to use in the path
-	domid_str = malpage_kzalloc(strlen("10000"));
+	domid_str = kzalloc(strlen("10000"),GFP_KERNEL);
 	sprintf(domid_str, "%u", rep->domid);
 
 	pid_str = malpage_kzalloc(strlen("100000"));
 	sprintf(pid_str, "%u", rep->process_id);
 
-	report_path = malpage_kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str));
+	report_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str),GFP_KERNEL);
 	if((result = sprintf(report_path, "%s/%s",MALPAGE_XS_REPORT_PATH, domid_str)) < 1){
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
@@ -1663,7 +1656,7 @@ static int malpage_xs_report(process_report_t *rep){
 		return MALPAGE_GENERALERR;
 	}
 
-	report_gref_path = malpage_kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_GREF_PATH));
+	report_gref_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_GREF_PATH),GFP_KERNEL);
 	if((result = sprintf(report_gref_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_GREF_PATH)) < 1){
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
@@ -1683,8 +1676,8 @@ static int malpage_xs_report(process_report_t *rep){
     result = xenbus_transaction_end(xstrans, 0);
     //printk(KERN_ALERT "->malpage_xs_report: transaction end: %d",result);
 
-	pfn_str = malpage_kzalloc(strlen("18446744073709551615"));
-	gref_str = malpage_kzalloc(strlen("100000"));
+	pfn_str = kzalloc(strlen("18446744073709551615"),GFP_KERNEL);
+	gref_str = kzalloc(strlen("100000"),GFP_KERNEL);
 
 	for(i=0; i < rep->pfn_list_length; i ++){
 
@@ -1744,9 +1737,9 @@ static int malpage_xs_watch(process_report_t *rep){
 	printk(KERN_ALERT "->malpage_xs_watch\n");
 	#endif
 
-	xstrans = malpage_kzalloc(sizeof(struct xenbus_transaction));
-	pid_str = malpage_kzalloc(strlen("100000"));
-	domid_str = malpage_kzalloc(strlen("10000"));
+	xstrans = kzalloc(sizeof(struct xenbus_transaction),GFP_KERNEL);
+	pid_str = kzalloc(strlen("100000"),GFP_KERNEL);
+	domid_str = kzalloc(strlen("10000"),GFP_KERNEL);
 
 	result = xenbus_transaction_start(xstrans);
 
@@ -1757,7 +1750,7 @@ static int malpage_xs_watch(process_report_t *rep){
 	//Put grefs and frame nums in XS
 	//ULONG_MAX: 18446744073709551615
     
-	report_path = malpage_kzalloc(strlen(MALPAGE_XS_WATCHREPORT_PATH)+strlen(domid_str));
+	report_path = kzalloc(strlen(MALPAGE_XS_WATCHREPORT_PATH)+strlen(domid_str),GFP_KERNEL);
 	if((result = sprintf(report_path, "%s/%s",MALPAGE_XS_WATCHREPORT_PATH, domid_str)) < 1){
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "->malpage_xs_watch: sprintf broke: %d\n",result);
@@ -1905,7 +1898,7 @@ static int malpage_dump_file(process_report_t *rep){
 	mm_segment_t old_fs;
 	int nulls;
 
-	dump_filename = malpage_kzalloc(strlen(MALPAGE_DUMP_FILENAME)+10);
+	dump_filename = kzalloc(strlen(MALPAGE_DUMP_FILENAME)+10,GFP_KERNEL);
 	sprintf(dump_filename, MALPAGE_DUMP_FILENAME, rep->process_id);
 	printk(KERN_ALERT "Debugging Enabled, Dumping process memory to %s\n",dump_filename);
 	
@@ -2053,7 +2046,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                     //CRIT SECTION
 
-                    tmp = kzalloc(sizeof(struct req_list_t),0);
+                    tmp = kzalloc(sizeof(struct req_list_t),GFP_ATOMIC);
                     tmp->process_op_pid = resp->process_id;
                     tmp->process_op_op = MALPAGE_RING_KILL;
                     list_add_tail(&(tmp->list), &(response_queue.list));
@@ -2063,7 +2056,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
                     spin_unlock(&response_queue_lock);
                     up(thread_response_sem);
 
-                    skip=1;
+                    skip=0;
 					break;
 
 				case MALPAGE_RING_RESUME:
@@ -2073,7 +2066,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                     //CRIT SECTION
 
-                    tmp = kzalloc(sizeof(struct req_list_t),0);
+                    tmp = kzalloc(sizeof(struct req_list_t),GFP_ATOMIC);
                     tmp->process_op_pid = resp->process_id;
                     tmp->process_op_op = MALPAGE_RING_RESUME;
                     list_add_tail(&(tmp->list), &(response_queue.list));
@@ -2083,7 +2076,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
                     spin_unlock(&response_queue_lock);
                     up(thread_response_sem);
 
-                    skip=1;
+                    skip=0;
 					break;
 
 				case MALPAGE_RING_HALT:
@@ -2117,7 +2110,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                     //CRIT SECTION
 
-                    tmp = kzalloc(sizeof(struct req_list_t),0);
+                    tmp = kzalloc(sizeof(struct req_list_t),GFP_ATOMIC);
                     tmp->report_pid = (pid_t)resp->process_id;
                     list_add_tail(&(tmp->list), &(report_queue.list));
 

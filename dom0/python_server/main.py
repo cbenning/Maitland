@@ -49,7 +49,7 @@ MONITOR_DONE_REPORT = MONITOR_IOC_MAGIC+14
 MONITOR_MIN_DOMID = 1
 MONITOR_MAX_DOMID = 255
 
-import fcntl, os, sys, time, struct, commands, array, shutil, binascii, random, threading
+import fcntl, os, sys, time, struct, commands, array, shutil, binascii, random, threading, subprocess
 sys.path.append("/usr/lib/xen-4.0/lib/python/")
 from xen.xend.xenstore.xsutil import *
 from xen.xend.xenstore.xswatch import *
@@ -211,10 +211,12 @@ def watch_domain_report(path, xs):
         ops.doMonitorOp(MONITOR_REPORT, procStruct)
         ops.close()
 
-        '''
+
+        
         print "Dumping memory"
         f1 = open(MONITOR_DEVICE,"rb")
-        filename = MONITOR_DUMP_DIR+""+str(pid)+"_dump.bin"
+        filename = MONITOR_DUMP_DIR+str(pid)+"_dump.bin"
+        print filename
         f2 = open(filename,"wb")
         tmp = f1.read(1096)
         index = 1096
@@ -227,12 +229,28 @@ def watch_domain_report(path, xs):
         
         f1.close()
         f2.close()
-        ''' 
+        
 
         print "looking for searchstring"
         op = MONITOR_RESUME
+
         search_str = "Calculation of PI using FFT and AGM" ##pi_css5
         #search_str = "This is a test"
+
+        try:
+            cmd = 'grep -Ubo --binary-files=text \"Calculation of PI using FFT and AGM\" '+filename
+            print cmd
+            result = subprocess.Popen([cmd],stdout=subprocess.PIPE,shell=True).communicate()[0]
+            #result = subprocess.check_output([cmd],stderr=subprocess.STDOUT,shell=True) #Doesnt exist until python 2.7
+            print result
+        except Exception as inst:
+            print type(inst)     # the exception instance
+            print inst.args      # arguments stored in .args
+            print inst           # __str__ allows args to printed directly
+
+
+    
+        '''
         index = 1024
         f1 = open(MONITOR_DEVICE,"rb")
         new_chunk = f1.read(index)
@@ -251,6 +269,8 @@ def watch_domain_report(path, xs):
             index += index
             new_chunk = f1.read(1024)
         f1.close()
+        '''
+
 
         ops = Monitor(MONITOR_DEVICE)
         procStruct = struct.pack("I",0)
@@ -260,11 +280,6 @@ def watch_domain_report(path, xs):
         print "Sending process cmd:"+str(op)
         ops.doMonitorOp(op, procStruct)
         ops.close()
-
-        #remove watch
-        #return False
-
-
 
         print "done: "+ident
         return True
