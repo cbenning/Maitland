@@ -49,11 +49,12 @@ MONITOR_DONE_REPORT = MONITOR_IOC_MAGIC+14
 MONITOR_MIN_DOMID = 1
 MONITOR_MAX_DOMID = 255
 
-import fcntl, os, sys, time, struct, commands, array, shutil, binascii
+import fcntl, os, sys, time, struct, commands, array, shutil, binascii, random, threading
 sys.path.append("/usr/lib/xen-4.0/lib/python/")
 from xen.xend.xenstore.xsutil import *
 from xen.xend.xenstore.xswatch import *
 
+global_sem = threading.Semaphore(1)
 
 class Monitor():
     def __init__(self,fileName):
@@ -90,13 +91,16 @@ def watch_domain_down(path, xs):
 def watch_domain_register(path, xs):
 
     #read the value, see if it's valid
+    global_sem.acquire()
     th = xs.transaction_start()    
     value = xs.read(th, path)
     xs.transaction_end(th)
+    global_sem.release()
     
     if (len(value) > 0):
 
         #delete the node
+        global_sem.acquire()
         th = xs.transaction_start()    
         print "Removing "+path 
         xs.rm(th,path)
@@ -127,12 +131,13 @@ def watch_domain_register(path, xs):
         xs.set_permissions(th,watchreport_path, [perm_tuple,perm_tuple,perm_tuple])       
         xs.transaction_end(th)
         
-        print "Watching path for report: "+watch_path
+        print "Watching path for report: "+watch_path+str(MONITOR_XS_REPORT_READY_PATH)
         xswatch(watch_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_report, xs)
-        print "Watching path for watch_report: "+watch_path
+        print "Watching path for watch_report: "+watchreport_path
         xswatch(watchreport_path+MONITOR_XS_REPORT_READY_PATH, watch_domain_watchreport, xs)
 
         print "Domain "+str(value)+" registered"
+        global_sem.release()
 
         #remove the watch
         return False
@@ -142,16 +147,24 @@ def watch_domain_register(path, xs):
 
 def watch_domain_report(path, xs):
     
-    #read the value, see if it's valid
-    th = xs.transaction_start()    
-    value = xs.read(th, path)
-    xs.transaction_end(th)    
 
-    if (len(value) > 0):
+    #read the value, see if it's valid
+    global_sem.acquire()
+    th = xs.transaction_start()
+    value = xs.read(th, path)
+    xs.transaction_end(th)
+    global_sem.release()
+
+    print str(path)+":"+str(value)
+    ident = str(random.randint(1,50))
+    print "start: "+ident
+
+    if(value is not None and len(value) > 0):
         
         reg_path=path.rsplit("/",1)[0]
         print "Report found at:"+reg_path
 
+        global_sem.acquire()
         th = xs.transaction_start()    
         dirs = xs.ls(th, reg_path+MONITOR_XS_REPORT_GREF_PATH)
         xs.transaction_end(th)
@@ -171,18 +184,18 @@ def watch_domain_report(path, xs):
         pid = int(xs.read(th,reg_path+MONITOR_XS_REPORT_PID_PATH))
         
         xs.transaction_end(th)
-        
+
         print "Received "+str(count)+" grefs, now removing report"
         
         #Nuke the report 
         th = xs.transaction_start()    
-        #xs.rm(th, reg_path)
         dirs = xs.ls(th, reg_path)
-        for dir in dirs:
-            print "removing: "+str(reg_path)+"/"+str(dir)
-            xs.rm(th,reg_path+"/"+str(dir))
+        for tmpdir in dirs:
+            print "removing: "+str(reg_path)+"/"+str(tmpdir)
+            xs.rm(th,reg_path+"/"+str(tmpdir))
         xs.transaction_end(th)    
-        
+        global_sem.release()
+
         print "Sending report to Monitor module..."       
         
         #print frames 
@@ -239,7 +252,6 @@ def watch_domain_report(path, xs):
             new_chunk = f1.read(1024)
         f1.close()
 
-
         ops = Monitor(MONITOR_DEVICE)
         procStruct = struct.pack("I",0)
         print "Sending Done Report"
@@ -248,19 +260,27 @@ def watch_domain_report(path, xs):
         print "Sending process cmd:"+str(op)
         ops.doMonitorOp(op, procStruct)
         ops.close()
+
         #remove watch
         #return False
+
+
+
+        print "done: "+ident
         return True
-    
+   
+    print "done: "+ident
     return True
     
     
 def watch_domain_watchreport(path, xs):
     
+    global_sem.acquire()
     #read the value, see if it's valid
     th = xs.transaction_start()    
     value = xs.read(th, path)
     xs.transaction_end(th)    
+    global_sem.release()
 
     if (len(value) > 0):
         
@@ -274,6 +294,7 @@ def watch_domain_watchreport(path, xs):
         #frames = []
         #count = 0
         
+        global_sem.acquire()
         th = xs.transaction_start()    
         #for dir in dirs:
         #    frames.append(int(dir))
@@ -287,7 +308,8 @@ def watch_domain_watchreport(path, xs):
         th = xs.transaction_start()    
         xs.rm(th, reg_path)
         xs.transaction_end(th)    
-        
+        global_sem.release()
+
         print "Sending watch report to Monitor module..."       
         
         #print frames 

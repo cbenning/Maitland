@@ -186,11 +186,6 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			printk(KERN_ALERT "Received report\n");
 			#endif
 
-            if(report_in_progress){
-                return 0;
-            }
-
-            report_in_progress = 1;
 			rep = monitor_populate_report(arg);
 			monitor_report(rep);
 
@@ -207,9 +202,6 @@ static int monitor_ioctl(struct inode *inode, struct file *filp, unsigned int cm
 			#ifdef MONITOR_DEBUG
 			printk(KERN_ALERT "Received Done Report\n");
 			#endif
-			if(report_in_progress){
-                report_in_progress = 0;
-            }
 			return 0;
 		break;
 		case MONITOR_RESUME:
@@ -569,6 +561,7 @@ static int monitor_report(process_report_t *rep) {
 	printk(KERN_ALERT "Successfully mapped %d pages",vm_struct_list_size);
 
     curr_proc = rep->process_id;
+	printk(KERN_ALERT "Setting curr_proc to: %u\n",(unsigned int)curr_proc);
 	//Do analysis
 
 	//Unmap RANGE

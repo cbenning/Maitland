@@ -203,6 +203,15 @@ typedef struct malpage_share_info_t {
 
 } malpage_share_info_t;
 
+
+struct req_list_t{
+    //struct request_t req;
+    pid_t report_pid;
+    unsigned int process_op_pid;
+    unsigned int process_op_op;
+    struct list_head list;
+};
+
 /************************************************************************
 Interface and Util Variables
 ************************************************************************/
@@ -213,19 +222,17 @@ static struct cdev malpage_cdev;
 static struct class* malpage_class;
 process_report_node_t *report_list;
 
-static struct semaphore *thread_lock_sem;
-static spinlock_t vars_lock;
-
-static unsigned int thread_op; //1:process,2:report
-//Process ops
-static unsigned int process_op_pid;
-static unsigned int process_op_op;
-static void *need_response;
+static struct semaphore *thread_report_sem;
+static struct semaphore *thread_response_sem;
 
 //Report ops
-static pid_t report_pid;
 static int report_running = 1;
 static struct task_struct* reporter;
+
+static struct req_list_t report_queue;
+static struct req_list_t response_queue;
+static spinlock_t report_queue_lock;
+static spinlock_t response_queue_lock;
 
 /************************************************************************
 Grant table and Interdomain Variables
@@ -242,7 +249,6 @@ extern int (*kmalpage_do_page_fault)(struct task_struct *task, unsigned long add
 static int malpage_init(void);
 static void malpage_exit(void);
 static int malpage_report_thread(void* args);
-static int malpage_process_op_thread(void* args);
 static int malpage_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg );
 static int malpage_mmu_update(struct mmu_update *req, int count,int *success_count, domid_t domid);
 //static int malpage_multi_mmu_update(struct multicall_entry *mcl, struct mmu_update *req, int count,int *success_count, domid_t domid);
