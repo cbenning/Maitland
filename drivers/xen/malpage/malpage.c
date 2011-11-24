@@ -211,6 +211,7 @@ static int malpage_report_thread(void* args){
     while(report_running){
         
         //HANDLE REPORT
+        msleep(MALPAGE_REPORT_MIN_INTERVAL);
         down_interruptible(thread_report_sem); //Wait for report request
         spin_lock(&report_queue_lock); 
 
@@ -228,7 +229,9 @@ static int malpage_report_thread(void* args){
 
         malpage_op_process(MALPAGE_RING_HALT,report_pid);
         malpage_report(report_pid,malpage_share_info);
+        malpage_op_process(MALPAGE_RING_RESUME,report_pid);
 
+        /*
         //HANDLE RESPONSE
         down_interruptible(thread_response_sem); //Wait for report request
         spin_lock(&response_queue_lock); 
@@ -247,7 +250,7 @@ static int malpage_report_thread(void* args){
         spin_unlock(&response_queue_lock); 
 
         malpage_op_process(process_op_op,process_op_pid);
-
+        */
 
     }
     return 0;
@@ -837,7 +840,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	spin_lock(&tsk_mm->page_table_lock);
 
 	#ifdef MALPAGE_DEBUG
-	printk(KERN_ALERT "%s: Process memory stats, total_vm:%lu, locked_vm:%lu, shared_vm:%lu, exec_vm:%lu, stack_vm:%lu, reserved_vm:%lu\n",__func__, tsk_mm->total_vm, tsk_mm->locked_vm, tsk_mm->shared_vm, tsk_mm->exec_vm, tsk_mm->stack_vm, tsk_mm->reserved_vm);
+	//printk(KERN_ALERT "%s: Process memory stats, total_vm:%lu, locked_vm:%lu, shared_vm:%lu, exec_vm:%lu, stack_vm:%lu, reserved_vm:%lu\n",__func__, tsk_mm->total_vm, tsk_mm->locked_vm, tsk_mm->shared_vm, tsk_mm->exec_vm, tsk_mm->stack_vm, tsk_mm->reserved_vm);
 	#endif
 
 	do{
@@ -848,15 +851,16 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 		current_vma_vm_length = current_vma_vm_end-current_vma_vm_start;
 
 		#ifdef MALPAGE_DEBUG
-		printk(KERN_ALERT "%s: found new memory region, size:%lu, pgprot:%lu\n",__func__,current_vma_vm_length,current_vma->vm_page_prot.pgprot);
+		//printk(KERN_ALERT "%s: found new memory region, size:%lu, pgprot:%lu\n",__func__,current_vma_vm_length,current_vma->vm_page_prot.pgprot);
 		#endif
 
 		skip = 0;
 
 		//Check if this is the heap
+        /*
 		if(!(current_vma->vm_flags & VM_WRITE )){
 			skip=1;
-		}
+		}*/
 
 		local_page_count=0;
 		while(current_vma_vm_length>=0 && !skip){
@@ -885,29 +889,6 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                 tmp_pfn = NULL;
                 //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 
-                /*
-				if(!root_exists){
-                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-					pfn_root = kzalloc(sizeof(pfn_ll_node),GFP_ATOMIC);
-                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-					pfn_root->pfn = new_mfn;
-                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-					pfn_root->next = NULL;
-					root_exists = 1;
-					tmp_pfn_root = pfn_root;
-				}
-				else{
-                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-					tmp_pfn = kzalloc(sizeof(pfn_ll_node),GFP_ATOMIC);
-                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-					tmp_pfn->pfn = new_mfn;
-                    printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-					tmp_pfn->next = NULL;
-					tmp_pfn_root->next = tmp_pfn;
-					tmp_pfn_root = tmp_pfn_root->next;
-                    tmp_pfn = NULL;
-				}
-                */
 				local_page_count++;
 			}
 			//If we just got the last addr, bail out
@@ -960,7 +941,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                     current_anon_vma_vm_length = current_anon_vma_vm_end-current_anon_vma_vm_start;
 
                     #ifdef MALPAGE_DEBUG
-                    printk(KERN_ALERT "		%s: found new ANON memory region, size:%lu, pgprot:%lu\n",__func__,current_anon_vma_vm_length,current_anon_vma->vm_page_prot.pgprot);
+                    //printk(KERN_ALERT "		%s: found new ANON memory region, size:%lu, pgprot:%lu\n",__func__,current_anon_vma_vm_length,current_anon_vma->vm_page_prot.pgprot);
                     #endif
 
                     while(current_anon_vma_vm_length>=0){
@@ -992,24 +973,6 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                             }
                             tmp_pfn = NULL;
                             //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-
-                            //Set root if we havent already
-                            /*
-                            if(!root_exists){
-                                pfn_root = kzalloc(sizeof(pfn_ll_node),GFP_KERNEL);
-                                pfn_root->pfn = new_mfn;
-                                pfn_root->next = NULL;
-                                root_exists = 1;
-                                tmp_pfn_root = pfn_root;
-                            }
-                            else{
-                                tmp_pfn = kzalloc(sizeof(pfn_ll_node),GFP_KERNEL);
-                                tmp_pfn->pfn = new_mfn;
-                                tmp_pfn->next = NULL;
-                                tmp_pfn_root->next = tmp_pfn;
-                                tmp_pfn_root = tmp_pfn_root->next;
-                            }
-                            */
 
                         }
 
@@ -1642,7 +1605,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 
 	//Make the pfn list
 	//tmp_root = pfnlist(task, 1);
-	tmp_root = pfnlist_vmarea(task,0, 0);
+	tmp_root = pfnlist_vmarea(task,1, 0);
 
 	#ifdef MALPAGE_DEBUG
 	printk(KERN_ALERT "Calculating number of pfns.\n");
@@ -1663,7 +1626,7 @@ static process_report_t* malpage_generate_report(struct task_struct *task) {
 	printk(KERN_ALERT "Determining process age.\n");
 	#endif
 
-	rep->process_age = 0;
+	rep->process_age = 0;//FIXME
 
 	return rep;
 }
@@ -2062,11 +2025,10 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 	struct response_t *resp;
     struct req_list_t *tmp;
     RING_IDX rc, rp;
-    int skip;
+    int skip, added;
 	#ifdef MALPAGE_DEBUG	
 	//printk(KERN_ALERT "DomU: Handling Event\n");
 	#endif
-    skip = 0;
 	again:
 
 		rp = malpage_share_info->fring.sring->rsp_prod;
@@ -2083,6 +2045,10 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 				case MALPAGE_RING_KILL:
 
                     printk(KERN_ALERT  "\nMalpage, Got KILLOP: %d,%d\n", resp->operation, resp->process_id);
+                    malpage_op_process(MALPAGE_RING_KILL,resp->process_id);
+                    spin_lock(&report_queue_lock);//BIGGEST HACK OF ALLLLLL TIME
+
+                    /*
                     spin_lock(&response_queue_lock);
 
                     //CRIT SECTION
@@ -2096,13 +2062,13 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                     spin_unlock(&response_queue_lock);
                     up(thread_response_sem);
-
+                    */
                     skip=0;
 					break;
 
 				case MALPAGE_RING_RESUME:
                 
-                    
+                    /*
                     printk(KERN_ALERT  "\nMalpage, Got RESUMEOP: %d,%d\n", resp->operation, resp->process_id);
                     spin_lock(&response_queue_lock);
 
@@ -2117,7 +2083,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                     spin_unlock(&response_queue_lock);
                     up(thread_response_sem);
-                    
+                    */
                     skip=0;
 					break;
 
@@ -2147,19 +2113,25 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
                 case MALPAGE_RING_REPORT:
 
 
-                    printk(KERN_ALERT  "\nMalpage, Got REPORTOP: %d, %u\n", resp->operation,resp->process_id);
+                    //printk(KERN_ALERT  "\nMalpage, Got REPORTOP: %d, %u\n", resp->operation,resp->process_id);
                     spin_lock(&report_queue_lock);
 
                     //CRIT SECTION
 
-                    tmp = kzalloc(sizeof(struct req_list_t),GFP_ATOMIC);
-                    tmp->report_pid = (pid_t)resp->process_id;
-                    list_add_tail(&(tmp->list), &(report_queue.list));
+                    //added = 0;
+                    //if(list_empty(&(report_queue.list))){
+                        tmp = kzalloc(sizeof(struct req_list_t),GFP_ATOMIC);
+                        tmp->report_pid = (pid_t)resp->process_id;
+                        list_add_tail(&(tmp->list), &(report_queue.list));
+                        added = 1;
+                    //}
 
                     //CRIT SECTION
 
                     spin_unlock(&report_queue_lock);
-                    up(thread_report_sem);
+                    if(added){
+                        up(thread_report_sem);
+                    }
 
                     skip=1;
 					break;

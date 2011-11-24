@@ -4,7 +4,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <time.h>
-#define NUMPAGES 30
+#define NUMPAGES 300
 #define PAGESIZE 4096
 #define MEMSIZE PAGESIZE*NUMPAGES
 //getpagesize()
@@ -23,10 +23,12 @@ int main( int argc, const char* argv[] ){
 		sprintf(buf,"This is not a test:%d\n",(int)time(NULL));
 		strcpy(empty_var+i*PAGESIZE,buf);
 	}
+    i = 0;
 
-	while(1){
-        printf("JAJAJA\n");
+	while(i < 20){
+        //printf("JAJAJA\n");
 		sleep(1.0);
+        i++;
 	}
 
     return 0;

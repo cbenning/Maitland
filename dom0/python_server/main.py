@@ -233,16 +233,18 @@ def watch_domain_report(path, xs):
 
         try:
             cmd = 'grep -Ubo --binary-files=text \"'+search_str+'\" '+filename
-            print cmd
             result = subprocess.Popen([cmd],stdout=subprocess.PIPE,shell=True).communicate()[0]
             #result = subprocess.check_output([cmd],stderr=subprocess.STDOUT,shell=True) #Doesnt exist until python 2.7
-            print result
+            result = result.rstrip('\n')
+            if(len(result)>0):
+                op = MONITOR_KILL
+                print "Found Searchstring"
         except Exception as inst:
             print type(inst)     # the exception instance
             print inst.args      # arguments stored in .args
             print inst           # __str__ allows args to printed directly
     
-        
+        '''
         index = 1024
         f1 = open(MONITOR_DEVICE,"rb")
         new_chunk = f1.read(index)
@@ -261,12 +263,13 @@ def watch_domain_report(path, xs):
             index += index
             new_chunk = f1.read(1024)
         f1.close()
-
+        '''
 
         ops = Monitor(MONITOR_DEVICE)
         procStruct = struct.pack("I",0)
-        print "Sending Done Report"
-        ops.doMonitorOp(MONITOR_DONE_REPORT, procStruct)
+
+        #print "Sending Done Report"
+        #ops.doMonitorOp(MONITOR_DONE_REPORT, procStruct)
 
         print "Sending process cmd:"+str(op)
         ops.doMonitorOp(op, procStruct)

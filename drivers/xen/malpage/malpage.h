@@ -103,6 +103,8 @@
 #define MALPAGE_XSERR -14
 #define MALPAGE_SYSFSERR -15
 
+#define MALPAGE_REPORT_MIN_INTERVAL 200
+
 //Dump
 #define MALPAGE_DUMP_COUNT 10
 #define MALPAGE_DUMP_FILENAME "/tmp/%d_dump.bin"

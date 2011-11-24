@@ -83,6 +83,7 @@ int main( int argc, char* argv[] ){
                 return -1;
             }
 
+            //printf("Got PID %u\n",(unsigned int)pid);
             //run watch
 			if(!test_mode){
 				ret_val = ioctl(file_desc, MALPAGE_WATCH, pid);
@@ -184,7 +185,7 @@ int main( int argc, char* argv[] ){
             logfile = NULL;
             asprintf(&logfile, "/root/data_%s", command+2);
             file = fopen(logfile,"w");
-		fprintf(file,"%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
+            fprintf(file,"%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
             fclose(file);
 
 		}
