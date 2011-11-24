@@ -2,10 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <errno.h>
 #include <unistd.h>
 #include <time.h>
-#define NUMPAGES 300
+#define NUMPAGES 30
 #define PAGESIZE 4096
 #define MEMSIZE PAGESIZE*NUMPAGES
 //getpagesize()
@@ -16,7 +15,6 @@ int main( int argc, const char* argv[] ){
 	int i;
 	char buf[100];
 	int tmp;
-	extern int errno;  
 
 	empty_var = calloc(NUMPAGES,PAGESIZE);
 
@@ -25,10 +23,13 @@ int main( int argc, const char* argv[] ){
 		sprintf(buf,"This is not a test:%d\n",(int)time(NULL));
 		strcpy(empty_var+i*PAGESIZE,buf);
 	}
-    
+
 	while(1){
-        printf("JAJAJA");
+        printf("JAJAJA\n");
 		sleep(1.0);
 	}
 
+    return 0;
+
 }
+

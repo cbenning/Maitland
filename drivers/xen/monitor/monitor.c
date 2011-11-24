@@ -467,10 +467,11 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 
+                        printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
                         //If the process is one we are watching
 						if(monitor_check_mmuupdate(req.mmu_ptr,req.mmu_val,req.domid,req.process_id)>0){
 
-                            //printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%d:%u", __FUNCTION__,req.domid,req.process_id);
+                            printk(KERN_ALERT "%s: MONITOR_RING_MMUUPDATE:%d:%u", __FUNCTION__,req.domid,req.process_id);
                             resp.process_id = req.process_id;
                             resp.domid = req.domid;
                             resp.mmu_ptr = req.mmu_ptr;
@@ -485,6 +486,7 @@ static irqreturn_t monitor_irq_handle(int irq, void *dev_id){
 	
 					if(req.domid>0 && req.domid < MONITOR_MAX_VMS){
 
+                        printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
                         //If the process is one we are watching
 						if(!report_in_progress && monitor_check_page_fault(req.domid,req.process_id,req.fault_addr)>0){
  

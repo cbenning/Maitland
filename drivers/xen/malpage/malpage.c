@@ -813,6 +813,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	int duplicate_pages;
 	pfn_ll_node *pfn_root;
 	pfn_ll_node *tmp_pfn_root;
+	pfn_ll_node *pfn_tail;
 	pfn_ll_node *tmp_pfn;
 
 	//Init list
@@ -847,7 +848,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 		current_vma_vm_length = current_vma_vm_end-current_vma_vm_start;
 
 		#ifdef MALPAGE_DEBUG
-		//printk(KERN_ALERT "%s: found new memory region, size:%lu, pgprot:%lu\n",__func__,current_vma_vm_length,current_vma->vm_page_prot.pgprot);
+		printk(KERN_ALERT "%s: found new memory region, size:%lu, pgprot:%lu\n",__func__,current_vma_vm_length,current_vma->vm_page_prot.pgprot);
 		#endif
 
 		skip = 0;
@@ -865,13 +866,30 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 				page_all_count++;
 				anon_vma_count++;
 				//Set root if we havent already
+
+                //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                tmp_pfn = kzalloc(sizeof(pfn_ll_node),GFP_ATOMIC);
+                //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                tmp_pfn->pfn = new_mfn;
+                if(pfn_root==NULL){
+                    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                    pfn_root = tmp_pfn;
+                    pfn_tail = pfn_root;
+                }
+                else{
+                    //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                    pfn_tail->next = tmp_pfn;
+                    pfn_tail=tmp_pfn;
+                    pfn_tail->next=NULL;
+                }
+                tmp_pfn = NULL;
+                //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+
+                /*
 				if(!root_exists){
                     printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 					pfn_root = kzalloc(sizeof(pfn_ll_node),GFP_ATOMIC);
                     printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-                    if(!pfn_root){
-                        printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
-                    }
 					pfn_root->pfn = new_mfn;
                     printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
 					pfn_root->next = NULL;
@@ -889,6 +907,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 					tmp_pfn_root = tmp_pfn_root->next;
                     tmp_pfn = NULL;
 				}
+                */
 				local_page_count++;
 			}
 			//If we just got the last addr, bail out
@@ -896,7 +915,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 				break;
 			}
 			//Move down the line
-			current_vma_vm_length-=PAGE_SIZE;
+			current_vma_vm_length-=(PAGE_SIZE/2);
 			//If we are at the end, stay at the end
 			if(current_vma_vm_length<0){
 				current_vma_vm_length=0;
@@ -941,7 +960,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                     current_anon_vma_vm_length = current_anon_vma_vm_end-current_anon_vma_vm_start;
 
                     #ifdef MALPAGE_DEBUG
-                    //printk(KERN_ALERT "		%s: found new ANON memory region, size:%lu, pgprot:%lu\n",__func__,current_anon_vma_vm_length,current_anon_vma->vm_page_prot.pgprot);
+                    printk(KERN_ALERT "		%s: found new ANON memory region, size:%lu, pgprot:%lu\n",__func__,current_anon_vma_vm_length,current_anon_vma->vm_page_prot.pgprot);
                     #endif
 
                     while(current_anon_vma_vm_length>=0){
@@ -955,7 +974,27 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                             #endif
 
                             page_all_count++;
+
+                            //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                            tmp_pfn = kzalloc(sizeof(pfn_ll_node)+4,GFP_ATOMIC);
+                            //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                            tmp_pfn->pfn = new_mfn;
+                            if(pfn_root==NULL){
+                                //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                                pfn_root = tmp_pfn;
+                                pfn_tail = pfn_root;
+                            }
+                            else{
+                                //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+                                pfn_tail->next = tmp_pfn;
+                                pfn_tail=tmp_pfn;
+                                pfn_tail->next=NULL;
+                            }
+                            tmp_pfn = NULL;
+                            //printk(KERN_ALERT "%s: GOT: %d\n",__func__,__LINE__);//FIXME
+
                             //Set root if we havent already
+                            /*
                             if(!root_exists){
                                 pfn_root = kzalloc(sizeof(pfn_ll_node),GFP_KERNEL);
                                 pfn_root->pfn = new_mfn;
@@ -970,6 +1009,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                                 tmp_pfn_root->next = tmp_pfn;
                                 tmp_pfn_root = tmp_pfn_root->next;
                             }
+                            */
 
                         }
 
@@ -979,7 +1019,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
                         }
 
                         //Move down the line
-                        current_anon_vma_vm_length-=PAGE_SIZE;
+                        current_anon_vma_vm_length-=(PAGE_SIZE/2);
 
                         //If we are at the end, stay at the end
                         if(current_anon_vma_vm_length<0){
@@ -1009,6 +1049,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 	if(duplicates){
 		duplicate_pages = pfnlist_mkunique(pfn_root);
 	}
+
 	#ifdef MALPAGE_DEBUG
 	//printk(KERN_ALERT "pfn_list done, returning.\n");
 	printk(KERN_ALERT "found %d pfns, %d vmas, %d anon_vmas, %d were duplicates\n",page_all_count,vma_count,anon_vma_count,duplicate_pages);
@@ -1642,13 +1683,13 @@ static int malpage_xs_report(process_report_t *rep){
 
     retry_transaction:
 	//Get a string version of the domid to use in the path
-	domid_str = kzalloc(strlen("10000"),GFP_KERNEL);
+	domid_str = kzalloc(strlen("10000"),GFP_ATOMIC);
 	sprintf(domid_str, "%u", rep->domid);
 
-	pid_str = malpage_kzalloc(strlen("100000"));
+	pid_str = kzalloc(strlen("100000"),GFP_ATOMIC);
 	sprintf(pid_str, "%u", rep->process_id);
 
-	report_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str),GFP_KERNEL);
+	report_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str),GFP_ATOMIC);
 	if((result = sprintf(report_path, "%s/%s",MALPAGE_XS_REPORT_PATH, domid_str)) < 1){
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
@@ -1656,7 +1697,7 @@ static int malpage_xs_report(process_report_t *rep){
 		return MALPAGE_GENERALERR;
 	}
 
-	report_gref_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_GREF_PATH),GFP_KERNEL);
+	report_gref_path = kzalloc(strlen(MALPAGE_XS_REPORT_PATH)+strlen(domid_str)+strlen(MALPAGE_XS_REPORT_GREF_PATH),GFP_ATOMIC);
 	if((result = sprintf(report_gref_path, "%s/%s/%s",MALPAGE_XS_REPORT_PATH, domid_str, MALPAGE_XS_REPORT_GREF_PATH)) < 1){
 		#ifdef MALPAGE_DEBUG
 		printk(KERN_ALERT "->malpage_xs_report: sprintf broke: %d\n",result);
@@ -1676,8 +1717,8 @@ static int malpage_xs_report(process_report_t *rep){
     result = xenbus_transaction_end(xstrans, 0);
     //printk(KERN_ALERT "->malpage_xs_report: transaction end: %d",result);
 
-	pfn_str = kzalloc(strlen("18446744073709551615"),GFP_KERNEL);
-	gref_str = kzalloc(strlen("100000"),GFP_KERNEL);
+	pfn_str = kzalloc(strlen("18446744073709551615"),GFP_ATOMIC);
+	gref_str = kzalloc(strlen("100000"),GFP_ATOMIC);
 
 	for(i=0; i < rep->pfn_list_length; i ++){
 
@@ -2061,6 +2102,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
 				case MALPAGE_RING_RESUME:
                 
+                    
                     printk(KERN_ALERT  "\nMalpage, Got RESUMEOP: %d,%d\n", resp->operation, resp->process_id);
                     spin_lock(&response_queue_lock);
 
@@ -2075,7 +2117,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                     spin_unlock(&response_queue_lock);
                     up(thread_response_sem);
-
+                    
                     skip=0;
 					break;
 

@@ -155,9 +155,9 @@ def watch_domain_report(path, xs):
     xs.transaction_end(th)
     global_sem.release()
 
-    print str(path)+":"+str(value)
-    ident = str(random.randint(1,50))
-    print "start: "+ident
+    #print str(path)+":"+str(value)
+    #ident = str(random.randint(1,50))
+    #print "start: "+ident
 
     if(value is not None and len(value) > 0):
         
@@ -199,10 +199,8 @@ def watch_domain_report(path, xs):
         print "Sending report to Monitor module..."       
         
         #print frames 
-            
         grefArr = array.array('I',grefs)    
         pfnArr = array.array('L',pfns)
-                
         #print "GOT:"+str(sys._getframe().f_lineno) #FIXME
         
         ops = Monitor(MONITOR_DEVICE)
@@ -210,23 +208,18 @@ def watch_domain_report(path, xs):
         procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],grefArr.buffer_info()[0],count)
         ops.doMonitorOp(MONITOR_REPORT, procStruct)
         ops.close()
-
-
         
         print "Dumping memory"
         f1 = open(MONITOR_DEVICE,"rb")
         filename = MONITOR_DUMP_DIR+str(pid)+"_dump.bin"
-        print filename
         f2 = open(filename,"wb")
         tmp = f1.read(1096)
         index = 1096
-        
         while(tmp):
             f2.write(tmp)
             f1.seek(1096+index)
             tmp = f1.read(1096)
             index = index+1096
-        
         f1.close()
         f2.close()
         
@@ -234,11 +227,12 @@ def watch_domain_report(path, xs):
         print "looking for searchstring"
         op = MONITOR_RESUME
 
-        search_str = "Calculation of PI using FFT and AGM" ##pi_css5
+        #search_str = "Calculation of PI using FFT and AGM" ##pi_css5
         #search_str = "This is a test"
+        search_str = "This is not a test"
 
         try:
-            cmd = 'grep -Ubo --binary-files=text \"Calculation of PI using FFT and AGM\" '+filename
+            cmd = 'grep -Ubo --binary-files=text \"'+search_str+'\" '+filename
             print cmd
             result = subprocess.Popen([cmd],stdout=subprocess.PIPE,shell=True).communicate()[0]
             #result = subprocess.check_output([cmd],stderr=subprocess.STDOUT,shell=True) #Doesnt exist until python 2.7
@@ -247,10 +241,8 @@ def watch_domain_report(path, xs):
             print type(inst)     # the exception instance
             print inst.args      # arguments stored in .args
             print inst           # __str__ allows args to printed directly
-
-
     
-        '''
+        
         index = 1024
         f1 = open(MONITOR_DEVICE,"rb")
         new_chunk = f1.read(index)
@@ -269,7 +261,6 @@ def watch_domain_report(path, xs):
             index += index
             new_chunk = f1.read(1024)
         f1.close()
-        '''
 
 
         ops = Monitor(MONITOR_DEVICE)
@@ -281,10 +272,10 @@ def watch_domain_report(path, xs):
         ops.doMonitorOp(op, procStruct)
         ops.close()
 
-        print "done: "+ident
+        #print "done: "+ident
         return True
    
-    print "done: "+ident
+    #print "done: "+ident
     return True
     
     
