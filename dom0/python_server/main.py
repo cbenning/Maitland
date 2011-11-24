@@ -231,6 +231,7 @@ def watch_domain_report(path, xs):
         #search_str = "This is a test"
         search_str = "This is not a test"
 
+        '''
         try:
             cmd = 'grep -Ubo --binary-files=text \"'+search_str+'\" '+filename
             result = subprocess.Popen([cmd],stdout=subprocess.PIPE,shell=True).communicate()[0]
@@ -243,7 +244,7 @@ def watch_domain_report(path, xs):
             print type(inst)     # the exception instance
             print inst.args      # arguments stored in .args
             print inst           # __str__ allows args to printed directly
-    
+        '''
         '''
         index = 1024
         f1 = open(MONITOR_DEVICE,"rb")

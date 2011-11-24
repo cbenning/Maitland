@@ -92,7 +92,7 @@
 #define MALPAGE_GREF_PAGE_COUNT (PAGE_SIZE/sizeof(unsigned int))-1
 
 //Debug enabled
-#define MALPAGE_DEBUG 1
+#define MALPAGE_DEBUG 0
 
 //Error Codes
 #define MALPAGE_BADCMD -10
@@ -103,7 +103,7 @@
 #define MALPAGE_XSERR -14
 #define MALPAGE_SYSFSERR -15
 
-#define MALPAGE_REPORT_MIN_INTERVAL 200
+#define MALPAGE_REPORT_MIN_INTERVAL 300
 
 //Dump
 #define MALPAGE_DUMP_COUNT 10

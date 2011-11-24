@@ -19,4 +19,4 @@ $PROJ_ROOT/benchmark/getsoftirqs.sh \
 $PROJ_ROOT/domU/c_loader/loader \
 $PROJ_ROOT/domU/python_client/main.py" .
 #sh load_domU.sh
-#$PROJ_ROOT/benchmark/100MB.dat \
+#$PROJ_ROOT/benchmark/gzip/10MB.dat \

@@ -274,7 +274,7 @@ static int malpage_mmu_update(struct mmu_update *req, int count,int *success_cou
 	if(count<1 && malpage_share_info){
 		return 0;
 	}
-	printk(KERN_ALERT "malpage_mmu_update:%u",domid);
+	//printk(KERN_ALERT "malpage_mmu_update:%u",domid);
     /*
 	spin_lock(&malpage_mmu_info_lock);
 	// Write a request into the ring and update the req-prod pointer
@@ -1015,7 +1015,7 @@ static pfn_ll_node* pfnlist_vmarea(struct task_struct *task, int duplicates, int
 
 	#ifdef MALPAGE_DEBUG
 	//printk(KERN_ALERT "pfn_list done, returning.\n");
-	printk(KERN_ALERT "found %d pfns, %d vmas, %d anon_vmas, %d were duplicates\n",page_all_count,vma_count,anon_vma_count,duplicate_pages);
+	//printk(KERN_ALERT "found %d pfns, %d vmas, %d anon_vmas, %d were duplicates\n",page_all_count,vma_count,anon_vma_count,duplicate_pages);
 	#endif
 
 	return pfn_root;
