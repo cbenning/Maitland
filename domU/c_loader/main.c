@@ -28,9 +28,9 @@ int main( int argc, char* argv[] ){
 	struct timeval *start_time,*end_time;
     long elapsed_sec,elapsed_usec;
 	int test_mode;
-    int shmkey,shmkey2,shmid;
+    int shmkey,shmkey2,shmid,shmid2;
     long start_irqs,end_irqs,total_irqs;
-    void *shmarea;
+    void *shmarea,*shmarea2;
     shmkey = 1234;
     shmkey2 = 1235;
     FILE *fp;
@@ -73,7 +73,6 @@ int main( int argc, char* argv[] ){
         //start_time = calloc(sizeof(struct timeval),1);
         end_time = calloc(sizeof(struct timeval),1);
         end_irqs_str = calloc(1024,1);
-        
 
 		//If current thread is the child
 		if (pid == 0){
@@ -83,7 +82,6 @@ int main( int argc, char* argv[] ){
                 return -1;
             }
 
-            //printf("Got PID %u\n",(unsigned int)pid);
             //run watch
 			if(!test_mode){
 				ret_val = ioctl(file_desc, MALPAGE_WATCH, pid);
@@ -103,23 +101,24 @@ int main( int argc, char* argv[] ){
                 exit(1);
             }
             start_time = (struct timeval*)shmarea;
-
-            if((shmid = shmget(shmkey2, 1024, IPC_CREAT | 0666)) < 0) {
+            /*
+            printf("GOT1\n");
+            if((shmid2 = shmget(shmkey2, sizeof(start_irqs_str), IPC_CREAT | 0666)) < 0) {
                 exit(1);
             }
 
-            if((shmarea = shmat(shmid, NULL, 0)) == (char *) -1) {
+            if((shmarea2 = shmat(shmid2, NULL, 0)) == (char *) -1) {
                 exit(1);
             }
 
-            start_irqs_str = (char*)shmarea;
+            start_irqs_str = (char*)shmarea2;
+            */
             sleep(3);
 
             /* Open the command for reading. */
-            fp = popen(IRQ_SCRIPT, "r");
-            fgets(start_irqs_str, sizeof(start_irqs_str)-1, fp);
-            pclose(fp);
-
+            //fp = popen(IRQ_SCRIPT, "r");
+            //fgets(start_irqs_str, sizeof(start_irqs_str)-1, fp);
+            //pclose(fp);
 			gettimeofday(start_time,NULL);
 			//printf("Start Time: %lu, %lu\n",start_time->tv_sec,start_time->tv_usec);
             if(test_mode){
@@ -138,34 +137,34 @@ int main( int argc, char* argv[] ){
 		else{
 
 		    wait(&status);
+            printf("GOT2\n");
 			gettimeofday(end_time,NULL);
 
             /* Open the command for reading. */
 
-            fp = popen(IRQ_SCRIPT, "r");
-            fgets(end_irqs_str, sizeof(end_irqs_str)-1, fp);
-            pclose(fp);
+            //fp = popen(IRQ_SCRIPT, "r");
+            //fgets(end_irqs_str, sizeof(end_irqs_str)-1, fp);
+            //pclose(fp);
 
             if((shmid = shmget(shmkey, sizeof(struct timeval), IPC_CREAT | 0666)) < 0) {
-                perror("shmget");
                 exit(1);
             }
 
             if((shmarea = shmat(shmid, NULL, 0)) == (char *) -1) {
-                perror("shmat");
                 exit(1);
             }
             start_time = (struct timeval*)shmarea;
-
-            if((shmid = shmget(shmkey2, sizeof(start_irqs_str), IPC_CREAT | 0666)) < 0) {
+            
+            /*
+            if((shmid2 = shmget(shmkey2, sizeof(start_irqs_str), IPC_CREAT |  0666)) < 0) {
                 exit(1);
             }
 
-            if((shmarea = shmat(shmid, NULL, 0)) == (char *) -1) {
+            if((shmarea2 = shmat(shmid2, NULL, 0)) == (char *) -1) {
                 exit(1);
             }
-            start_irqs_str = (char*)shmarea;
-
+            start_irqs_str = (char*)shmarea2;   
+            */
             elapsed_sec = end_time->tv_sec - start_time->tv_sec;
             elapsed_usec = end_time->tv_usec - start_time->tv_usec;
             if(elapsed_usec < 0){
@@ -173,20 +172,32 @@ int main( int argc, char* argv[] ){
                 elapsed_usec = ONE_MILLION+elapsed_usec;
             }
 
-            start_irqs = atoi(start_irqs_str);
-            end_irqs = atoi(end_irqs_str);
-            total_irqs = end_irqs-start_irqs;
+            //start_irqs = atoi(start_irqs_str);
+            //end_irqs = atoi(end_irqs_str);
+            //total_irqs = end_irqs-start_irqs;
 
-			//printf("Str Time: %lu, %lu\n",start_time->tv_sec,start_time->tv_usec);
-			//printf("End Time: %lu, %lu\n",end_time->tv_sec,end_time->tv_usec);
-			printf("%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
+			printf("Str Time: %lu, %lu\n",start_time->tv_sec,start_time->tv_usec);
+			//printf("Str IRQ: %lu\n",start_irqs);
+			printf("End Time: %lu, %lu\n",end_time->tv_sec,end_time->tv_usec);
+			//printf("End IRQ: %lu\n",end_irqs);
+			//printf("%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
+			printf("%ld.%06ld\n",elapsed_sec,elapsed_usec);
 
 
             logfile = NULL;
             asprintf(&logfile, "/root/data_%s", command+2);
             file = fopen(logfile,"w");
-            fprintf(file,"%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
+            //fprintf(file,"%ld %ld.%06ld\n",total_irqs,elapsed_sec,elapsed_usec);
+            fprintf(file,"%ld.%06ld\n",elapsed_sec,elapsed_usec);
             fclose(file);
+
+            start_time->tv_sec=0;
+            start_time->tv_usec=0;
+            end_time->tv_sec=0;
+            end_time->tv_usec=0;
+            elapsed_sec=0;
+            elapsed_usec=0;
+            //total_irqs=0;
 
 		}
 	}

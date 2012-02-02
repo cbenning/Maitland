@@ -6,7 +6,6 @@
 #include <time.h>
 #define NUMPAGES 300
 #define PAGESIZE 4096
-#define MEMSIZE PAGESIZE*NUMPAGES
 //getpagesize()
 
 int main( int argc, const char* argv[] ){
@@ -14,18 +13,20 @@ int main( int argc, const char* argv[] ){
 	char *empty_var;
 	int i;
 	char buf[100];
-	int tmp;
+	int tmp,pagemult;
 
-	empty_var = calloc(NUMPAGES,PAGESIZE);
+    pagemult = atoi(argv[1]);
 
-	for(i=0; i < NUMPAGES; i++){
+	empty_var = calloc(pagemult,PAGESIZE);
+
+	for(i=0; i < pagemult; i++){
 		tmp = i*i;
 		sprintf(buf,"This is not a test:%d\n",(int)time(NULL));
 		strcpy(empty_var+i*PAGESIZE,buf);
 	}
     i = 0;
 
-	while(i < 20){
+	while(i < 1){
         //printf("JAJAJA\n");
 		sleep(1.0);
         i++;

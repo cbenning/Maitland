@@ -208,6 +208,7 @@ def watch_domain_report(path, xs):
         procStruct = struct.pack("IIIPPI",pid,domid,0,pfnArr.buffer_info()[0],grefArr.buffer_info()[0],count)
         ops.doMonitorOp(MONITOR_REPORT, procStruct)
         ops.close()
+       
         
         print "Dumping memory"
         f1 = open(MONITOR_DEVICE,"rb")
@@ -227,11 +228,16 @@ def watch_domain_report(path, xs):
         print "looking for searchstring"
         op = MONITOR_RESUME
 
-        #search_str = "Calculation of PI using FFT and AGM" ##pi_css5
+        #search_str = 'Number of digits of pi to calculate?' ##pi_css5
+        #search_str = 'UWVS' ##pi_css
+        #search_str = '\$89\$$' ##pi_css
+        #search_str = 'Allocation Failure!' ##pi_css5
+        #search_str = 'internal error in shorten_name' ##gzip
+        #search_str = '__stack_chk_fail' ##gzip
+        search_str = 'AWAVAUATU' ##gzip
         #search_str = "This is a test"
-        search_str = "This is not a test"
+        #search_str = "This is not a test"
 
-        '''
         try:
             cmd = 'grep -Ubo --binary-files=text \"'+search_str+'\" '+filename
             result = subprocess.Popen([cmd],stdout=subprocess.PIPE,shell=True).communicate()[0]
@@ -244,7 +250,7 @@ def watch_domain_report(path, xs):
             print type(inst)     # the exception instance
             print inst.args      # arguments stored in .args
             print inst           # __str__ allows args to printed directly
-        '''
+        
         '''
         index = 1024
         f1 = open(MONITOR_DEVICE,"rb")

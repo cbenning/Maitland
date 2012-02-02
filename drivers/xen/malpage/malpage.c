@@ -1837,6 +1837,10 @@ static int malpage_report(pid_t procID, malpage_share_info_t *info) {
     //if(!success || task->state<0){
     //    return -1;
     //}
+    if(!success){
+        return -1;
+    }
+
 
 	//Generate report
 	rep = malpage_generate_report(task);
@@ -1959,6 +1963,7 @@ static int malpage_op_process(unsigned int op, unsigned int pid){
 	}
 
 	if(task == NULL){
+	    printk(KERN_ALERT "Couldn't find task struct\n");
 		return -1;
 	}
 
@@ -2046,7 +2051,7 @@ static irqreturn_t malpage_irq_handle(int irq, void *dev_id) {
 
                     printk(KERN_ALERT  "\nMalpage, Got KILLOP: %d,%d\n", resp->operation, resp->process_id);
                     malpage_op_process(MALPAGE_RING_KILL,resp->process_id);
-                    spin_lock(&report_queue_lock);//BIGGEST HACK OF ALLLLLL TIME
+                    //spin_lock(&report_queue_lock);//BIGGEST HACK OF ALLLLLL TIME
 
                     /*
                     spin_lock(&response_queue_lock);
