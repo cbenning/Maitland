@@ -1,8 +1,29 @@
+# Maitland: A prototype paravirtualization-based packed malware detection system for Xen virtual machines
+# Copyright (C) 2011 Christopher A. Benninger
 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+--------------------------------------------
+Maitland
+--------------------------------------------
 
+Maitland is a prototype implementation of my thesis work. It is a paravirtualization-based framework for Xen virtual machine introspection. The existing code is an example of using this framework to detect and unpack packed or encrypted processes in remote virtual machines using only a simple Python wrapper for grep to detect signatures.
+
+As this is my thesis work, it contains some of the experiment scripts I wrote to help me out. I haven't trimmed many of the files which arent being used either.
+
+Disclaimer: This software is very unstable in its current state and as a prototype, works only in a very specifically setup environment. 
 
 --------------------------------------------
 Important Directories:
